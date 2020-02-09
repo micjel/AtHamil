@@ -357,11 +357,11 @@ contains
           do i = 1, NMesh
             ovlp = ovlp + wmesh(i) * wf(i,nbra,l) * wf(i,nket,l)
           end do
-          if(nbra == nket .and. abs(1.d0-ovlp) > 1.d-8) then
+          if(nbra == nket .and. abs(1.d0-ovlp) > 1.d-4) then
             write(*,"(a,3i3,f12.8)") "Warning: radial wave function norm", nbra,nket,l,ovlp
           end if
 
-          if(nbra /= nket .and. abs(ovlp) > 1.d-8) then
+          if(nbra /= nket .and. abs(ovlp) > 1.d-4) then
             write(*,"(a,3i3,f12.8)") "Warning: radial wave function norm", nbra,nket,l,ovlp
           end if
         end do
@@ -418,7 +418,7 @@ contains
     case("LO", "lo")
 #ifdef gauss_laguerre
       call fixed_point_quadrature("laguerre", NMesh, rmesh, rwmesh, weight_renorm=.false., &
-        & a_in=0.d0, b_in=1.d0, alpha_in=0.d0)
+        & a_in=0.d0, b_in=2.d0, alpha_in=0.d0)
 #else
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
@@ -429,7 +429,7 @@ contains
           do i = 1, NMesh
 #ifdef gauss_laguerre
             rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
-                & laguerre(n,dble(2*l+2),rmesh(i)) * rmesh(i)**(l+1)
+              & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
@@ -440,7 +440,7 @@ contains
     case("LO-2nl", "lo-2nl")
 #ifdef gauss_laguerre
       call fixed_point_quadrature("laguerre", NMesh, rmesh, rwmesh, weight_renorm=.false., &
-          & a_in=0.d0, b_in=1.d0, alpha_in=0.d0)
+          & a_in=0.d0, b_in=2.d0, alpha_in=0.d0)
 #else
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
@@ -451,7 +451,7 @@ contains
           do i = 1, NMesh
 #ifdef gauss_laguerre
             rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
-              & laguerre(n,dble(2*l+2),rmesh(i)) * rmesh(i)**(l+1)
+              & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
