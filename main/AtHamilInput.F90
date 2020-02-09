@@ -27,6 +27,8 @@ contains
   subroutine InitInputParameters(params)
     class(InputParameters), intent(inout) :: params
     real(8) :: zeta = 4.d0
+    integer :: NMesh = 1000
+    real(8) :: rmax=1.d3
     character(256) :: basis = "LO"
     character(512) :: file_name = "default"
     integer :: emax = 6
@@ -37,8 +39,9 @@ contains
     logical :: ex
 
     ! input file name
-    character(:), allocatable :: inputfile
-    namelist /input/ zeta, basis, file_name, emax, e2max, lmax, test_mode, count_memory
+    character(512) :: inputfile
+    namelist /input/ zeta, basis, file_name, emax, e2max, lmax, test_mode, count_memory, &
+        & rmax, NMesh
     call getarg(1, inputfile)
     inquire(file = inputfile, exist = ex)
     if(.not.ex) then
@@ -55,6 +58,8 @@ contains
     params%test_mode = test_mode
     params%zeta = zeta
     params%basis = basis
+    params%rmax = rmax
+    params%Nmesh = NMesh
     if(params%lmax==-1) params%lmax = params%emax
 
     params%count_memory = count_memory

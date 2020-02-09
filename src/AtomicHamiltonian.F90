@@ -39,7 +39,7 @@ module AtomicHamiltonian
   integer, private :: NMesh = 100
   real(8), private, allocatable :: rnl(:,:,:)
   real(8), private, allocatable :: rnl_mom(:,:,:)
-  real(8), private :: a_0, Eh, a_scale
+  real(8), private :: a_0, Eh
 
   type, private :: FL
     real(8), allocatable :: F(:)
@@ -93,7 +93,7 @@ contains
     integer :: n3, l3, n4, l4
     integer :: bra, ket
     integer :: cnt, i1, i2
-    real(8) :: integral, r1, r2, log_r, fact
+    real(8) :: integral, r1, r2, log_r, zeta
     real(8), allocatable :: inter(:,:,:)
 
 
@@ -102,13 +102,7 @@ contains
     lmax = -1
     nmin = 1000
     lmin = 1000
-    fact = 1.d0
-    select case(sps%basis)
-    case("HO", "ho","AO","ao")
-      fact = 1.d0
-    case("LO", "lo","LO-2nl", "lo-2nl")
-      fact = 0.5d0
-    end select
+    zeta = ms%zeta
     do a = 1, sps%norbs
       oa => sps%orb(a)
       nmin = min(nmin, oa%n)
@@ -205,11 +199,11 @@ contains
         if(mod(l1 + l3 + L, 2) == 1) cycle
 
         do i2 = 1, NMesh
-          r2 = rmesh(i2) * a_scale * fact
+          r2 = rmesh(i2) / zeta
           integral = 0.d0
           do i1 = 1, NMesh
-            r1 = rmesh(i1) * a_scale * fact
-            log_r = dble(L) * log(min(r1,r2)) - dble(L+1) * log(max(r1,r2)) + log(a_0)
+            r1 = rmesh(i1) / zeta
+            log_r = dble(L) * log(min(r1,r2)) - dble(L+1) * log(max(r1,r2))
             integral = integral + exp(log_r) * rnl(i1,n1,l1) * rnl(i1,n3,l3) * rwmesh(i1)
           end do
           inter(i2,L,ket) = integral
@@ -320,7 +314,7 @@ contains
     call this%S%eye(two%sps%norbs)
     this%is_init = .true.
     a_0 = hc / (m_e * 1.d3) * alpha ! bohr radius unit of nm nuclear mass infinity limit
-    Eh = hc / (a_0 * alpha) ! hartree
+    Eh = hc / (a_0 * alpha)         ! hartree
     select case(two%sps%basis)
     case("STO", "sto")
     case("GTO", "gto")
@@ -389,17 +383,15 @@ contains
     integer :: n, l, i
 
     two => this%ms
-    a_scale = a_0 / two%zeta
     ti = omp_get_wtime()
     select case(two%sps%basis)
     case("HO", "ho")
-      call gauss_legendre(0.d0, rmax*a_scale, rmesh, rwmesh, NMesh)
+      call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
       allocate(rnl(NMesh, 0:two%sps%emax/2, 0:two%sps%emax))
       rnl(:,:,:) = 0.d0
       do n = 0, two%sps%emax/2
         do l = 0, two%sps%emax
           do i = 1, NMesh
-            !rnl(i,n,l) = ho_radial_wf_norm(n, l, 1.d0/a_scale**2, rmesh(i))
             rnl(i,n,l) = ho_radial_wf_norm(n, l, 1.d0, rmesh(i))
           end do
         end do
@@ -407,8 +399,8 @@ contains
 
       call norm_check(rnl, rwmesh, "HO")
     case("AO", "ao")
-      call gauss_legendre(0.d0, rmax*a_scale, rmesh, rwmesh, NMesh)
-      call gauss_legendre(0.d0, rmax/a_scale, pmesh, pwmesh, NMesh)
+      call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
+      call gauss_legendre(0.d0, rmax, pmesh, pwmesh, NMesh)
       allocate(rnl(NMesh, 1:two%sps%emax, 0:two%sps%lmax))
       allocate(rnl_mom(NMesh, 1:two%sps%emax, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
@@ -416,8 +408,6 @@ contains
       do n = 1, two%sps%emax
         do l = 0, min(n-1,two%sps%lmax)
           do i = 1, NMesh
-            !rnl(i,n,l) = hydrogen_radial_wf_norm(n,l,a_scale,rmesh(i))
-            !rnl_mom(i,n,l) = hydrogen_radial_wf_mom_norm(n,l,a_scale,pmesh(i))
             rnl(i,n,l) = hydrogen_radial_wf_norm(n,l,1.d0,rmesh(i))
             rnl_mom(i,n,l) = hydrogen_radial_wf_mom_norm(n,l,1.d0,pmesh(i))
           end do
@@ -430,15 +420,19 @@ contains
       call fixed_point_quadrature("laguerre", NMesh, rmesh, rwmesh, weight_renorm=.false., &
         & a_in=0.d0, b_in=1.d0, alpha_in=0.d0)
 #else
-      call gauss_legendre(0.d0, rmax*a_scale, rmesh, rwmesh, NMesh)
+      call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
       allocate(rnl(NMesh, 0:two%sps%emax, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
       do n = 0, two%sps%emax
         do l = 0, two%sps%lmax
           do i = 1, NMesh
+#ifdef gauss_laguerre
             rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
-              & laguerre(n,dble(2*l+2),rmesh(i)) * rmesh(i)**(l+1)
+                & laguerre(n,dble(2*l+2),rmesh(i)) * rmesh(i)**(l+1)
+#else
+            rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
+#endif
           end do
         end do
       end do
@@ -448,15 +442,19 @@ contains
       call fixed_point_quadrature("laguerre", NMesh, rmesh, rwmesh, weight_renorm=.false., &
           & a_in=0.d0, b_in=1.d0, alpha_in=0.d0)
 #else
-      call gauss_legendre(0.d0, rmax*a_scale, rmesh, rwmesh, NMesh)
+      call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
       allocate(rnl(NMesh, 0:two%sps%emax/2, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
       do n = 0, two%sps%emax/2
         do l = 0, two%sps%lmax
           do i = 1, NMesh
+#ifdef gauss_laguerre
             rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
               & laguerre(n,dble(2*l+2),rmesh(i)) * rmesh(i)**(l+1)
+#else
+            rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
+#endif
           end do
         end do
       end do
@@ -483,18 +481,11 @@ contains
     type(EleOrbits), pointer :: sps
     type(EleSingleParticleOrbit), pointer :: oa, ob
     type(DMat) :: kine, U
-    real(8) :: r, hw, fact
+    real(8) :: r, hw, zeta
 
-    hw = hc **2 * this%ms%zeta**2 / (m_e*1.d3 * a_0**2)
+    zeta = this%ms%zeta
+    hw = hc **2 * zeta**2 / m_e*1.d3 ! in a.u.
     sps => this%ms%sps
-    fact = 1.d0
-    select case(sps%basis)
-    case("HO", "ho","AO","ao")
-      fact = 1.d0
-    case("LO", "lo","LO-2nl", "lo-2nl")
-      fact = 2.d0
-    end select
-
     call kine%zeros(sps%norbs, sps%norbs)
     call U%zeros(sps%norbs, sps%norbs)
     do a = 1, sps%norbs
@@ -510,21 +501,21 @@ contains
           if(oa%n == ob%n) r = dble(2 * oa%n + oa%l) + 1.5d0
           if(oa%n == ob%n-1) r = dsqrt(dble(oa%n + 1) * (dble(oa%n + oa%l) + 1.5d0))
           if(oa%n == ob%n+1) r = dsqrt(dble(ob%n + 1) * (dble(ob%n + ob%l) + 1.5d0))
-          r = r * hw * 0.5d0 / Eh
+          r = r * hw * 0.5d0
         case("AO","ao")
           do i = 1, NMesh
             r = r + rnl_mom(i,oa%n,oa%l) * rnl_mom(i,ob%n,ob%l) * &
-                & pwmesh(i) * (pmesh(i)/a_scale)**2 * 0.5d0 * hc**2 / (m_e * Eh * 1.d3)
+                & pwmesh(i) * (pmesh(i)*zeta)**2 * 0.5d0
           end do
         case("LO","lo","LO-2nl","lo-2nl")
           r = kinetic_energy_laguerre_func(oa%n,ob%n,oa%l)
-          r = r * hw / Eh
+          !r = r * hw / Eh
+          r = r * this%ms%zeta**2
         end select
         kine%m(a,b) = r
         kine%m(b,a) = r
       end do
     end do
-
 
     do a = 1, sps%norbs
       oa => sps%orb(a)
@@ -534,7 +525,7 @@ contains
         if(oa%l /= ob%l) cycle
         r = 0.d0
         do i = 1, NMesh
-          r = r + rnl(i,oa%n,oa%l) * rnl(i,ob%n,ob%l) * rwmesh(i) * a_0 * fact / (rmesh(i) * a_scale)
+          r = r + rnl(i,oa%n,oa%l) * rnl(i,ob%n,ob%l) * rwmesh(i) * zeta/ rmesh(i)
         end do
         U%m(a, b) = r
         U%m(b, a) = r
@@ -667,10 +658,8 @@ contains
 #endif
     write(wunit, "(3a)") "# Atomic Hamiltonian with ", trim(sps%basis), " basis"
     write(wunit, "(a,f6.4,a)") "# length scale is a_0 / ", ms%zeta, " with bohr radius a_0"
-    if(sps%basis == "HO" .or. sps%basis=="ho") then
-      write(wunit, "(a,f8.4,a)") "# Corresponding hw is ", &
-          & hc **2 * this%ms%zeta**2 / (m_e*1.d3 * a_0**2), " eV"
-    end if
+    write(wunit, "(a,f8.4,a)") "# Corresponding hw is ", &
+        & hc **2 * this%ms%zeta**2 / (m_e*1.d3 * a_0**2), " eV"
     write(wunit, "(a)") "# Definition of model space"
     write(wunit, "(a)") "# numbers of proton orbit, neutron orbit, proton core, neutron core"
     write(wunit, '(4i5)') sps%norbs, 0, 0, 0
@@ -691,7 +680,6 @@ contains
     write(wunit, '(a)') '####### one-body term'
     write(wunit, '(i5, i3)') cnt, 0
     write(wunit, '(a)') '### a, b, <a|t|b>, <a|1/r|b> (a.u.), <a|b>'
-    !write(wunit, '(a)') '### a, b, <a|t|b>, <a|1/r|b> (eV)'
     do bra = 1, sps%norbs
       do ket = 1, bra
         if(sps%orb(bra)%l /= sps%orb(ket)%l) cycle
