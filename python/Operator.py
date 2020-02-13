@@ -6,7 +6,7 @@ from TwoBodyOperator import TwoBodyOperator
 import numpy as np
 
 def main():
-    ms = ModelSpace(emax=1, zeta=2.0)
+    ms = ModelSpace(emax=0, zeta=2.0)
     Ham = Operator(ms)
     #Ham.set_operator("kinetic")
     Ham.set_operator("coulomb")

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import numpy as np
-from py3nj import wigner3j, wigner6j
-from scipy.special import gamma, assoc_laguerre
+#from py3nj import wigner3j, wigner6j
+from sympy.physics.wigner import wigner_3j, wigner_6j
+from sympy import N
+from scipy.special import gamma, assoc_laguerre, eval_gegenbauer
 from scipy import integrate
 from Orbits import ElectronOrbit
 def triangle(J1,J2,J3):
@@ -19,20 +21,44 @@ def laguerre_wave_function(x, zeta, n, l):
     eta = 2.0 * x / zeta
     return np.sqrt(2.0 * gamma(n+1) / (zeta * gamma(n+2*l+3)) ) * 2.0 * eta**l * np.exp(-0.5*eta) * assoc_laguerre(eta, n, 2*l+2) / zeta
 
+def laguerre_wave_function_mom(p, zeta, n, l):
+    """
+    Brute force fourier transformation of Laguerre function
+    """
+    xi = zeta * p * 0.5
+    x = 0.5 / np.sqrt( 0.25 + xi*xi )
+    r = 0.0
+    prefact = np.sqrt( zeta * gamma(n+1) * gamma(n+2*l+3) /np.pi ) * (0.5*zeta) * (2*x)**(2*l+3) * (2*xi)**l * gamma(l+1)
+    for k in range(n+1):
+        r += (-1)**k * (k+1) * (2*x)**k * eval_gegenbauer(k+1, l+1, x) / (gamma(n+1-k) * gamma(2*l+3+k) )
+    return r*prefact
+
 def thj(j1, j2, j3, m1, m2, m3):
     """
     3-j symbol
     ( j1 j2 j3 )
     ( m1 m2 m3 )
     """
-    return wigner3j(j1,j2,j3,m1,m2,m3)
+    #return wigner3j(j1,j2,j3,m1,m2,m3)
+    return N(wigner_3j(0.5*j1,0.5*j2,0.5*j3,0.5*m1,0.5*m2,0.5*m3))
 def sjs(j1, j2, j3, j4, j5, j6):
     """
     6-j symbol
     { j1 j2 j3 }
     { j4 j5 j6 }
     """
-    return wigner6j(j1,j2,j3,j4,j5,j6)
+    #return wigner6j(j1,j2,j3,j4,j5,j6)
+    return N(wigner_6j(0.5*j1,0.5*j2,0.5*j3,0.5*j4,0.5*j5,0.5*j6))
+
+def norm_laguerre_wave_function_mom(n1, n2, l):
+    """
+    """
+    return integrate.quad(lambda x: laguerre_wave_function_mom(x, 1.0, n1, l) * laguerre_wave_function_mom(x, 1.0, n2, l) * x*x, 0, np.inf)
+
+def T_laguerre_wave_function_int(n1, n2, l):
+    """
+    """
+    return integrate.quad(lambda x: laguerre_wave_function_mom(x, 1.0, n1, l) * laguerre_wave_function_mom(x, 1.0, n2, l) * x*x*x*x*0.5, 0, np.inf)
 
 def T_laguerre_wave_function(n1, n2, l):
     """
@@ -77,6 +103,16 @@ def ee_laguerre_wave_function(o1,o2,o3,o4,J,zeta):
 if(__name__=="__main__"):
     #for x in np.arange(0.0, 10.0, 1):
     #    print(x, laguerre_wave_function(x, 1.0, 0, 0))
-    print(thj(1,0,1,1,0,-1))
-    print(sjs(0,0,0,0,0,0))
-    print(coulomb_F_laguerre_wave_function(0,0, 0,0, 0,0, 0,0, 0,1))
+    l = 0
+    #for n1 in range(5):
+    #    t2 = norm_laguerre_wave_function_mom(n1,n1,l)[0]
+    #    print(n1, n1, t2)
+    for n1 in range(5):
+        for n2 in range(5):
+            t = T_laguerre_wave_function(n1,n2,l)
+            t2 = T_laguerre_wave_function_int(n1,n2,l)[0]
+            print(n1, n2, t-t2)
+
+    #print(thj(1,0,1,1,0,-1))
+    #print(sjs(0,0,0,0,0,0))
+    #print(coulomb_F_laguerre_wave_function(0,0, 0,0, 0,0, 0,0, 0,1))
