@@ -14,6 +14,9 @@ module AtomicHamiltonian
     type(AtomicHamilChan), allocatable :: MatCh(:,:)
     type(AtomicHamilChan) :: kinetic
     type(AtomicHamilChan) :: potential
+    type(AtomicHamilChan) :: kinetic_p4  ! relativistic correction for kinetic term
+    type(AtomicHamilChan) :: Darwin_term ! nucleus-electron contact interaction
+    type(AtomicHamilChan) :: LS_term     ! nucleus-electron spin-orbit interaction
     type(AtomicHamilChan) :: S
     type(EleTwoBodySpace), pointer :: ms
     logical :: is_init = .false.
@@ -269,6 +272,9 @@ contains
     end do
     call this%kinetic%fin()
     call this%potential%fin()
+    call this%kinetic_p4%fin()
+    call this%Darwin_term%fin()
+    call this%LS_term%fin()
     select case(this%ms%sps%basis)
     case("AO", "ao")
       deallocate(pmesh)
@@ -311,6 +317,9 @@ contains
     this%potential%Zero = .false.
     call this%kinetic%zeros(two%sps%norbs, two%sps%norbs)
     call this%potential%zeros(two%sps%norbs, two%sps%norbs)
+    call this%kinetic_p4%zeros(two%sps%norbs, two%sps%norbs)
+    call this%Darwin_term%zeros(two%sps%norbs, two%sps%norbs)
+    call this%LS_term%zeros(two%sps%norbs, two%sps%norbs)
     call this%S%eye(two%sps%norbs)
     this%is_init = .true.
     a_0 = hc / (m_e * 1.d3) * alpha ! bohr radius unit of nm nuclear mass infinity limit
@@ -374,7 +383,8 @@ contains
         & ho_radial_wf_norm, hydrogen_radial_wf_norm, &
         & hydrogen_radial_wf_mom_norm, &
         & laguerre_radial_wf_norm, &
-        & fixed_point_quadrature, ln_gamma, laguerre
+        & fixed_point_quadrature, ln_gamma, laguerre, &
+        & Mom_laguerre_radial_wf_norm
     class(AtomicHamil), intent(inout) :: this
     integer, intent(in) :: NMesh
     real(8), intent(in) :: rmax
@@ -422,7 +432,9 @@ contains
 #else
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
+      call gauss_legendre(0.d0, rmax, pmesh, pwmesh, NMesh)
       allocate(rnl(NMesh, 0:two%sps%emax, 0:two%sps%lmax))
+      allocate(rnl_mom(NMesh, 0:two%sps%emax, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
       do n = 0, two%sps%emax
         do l = 0, two%sps%lmax
@@ -433,10 +445,12 @@ contains
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
+            rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
           end do
         end do
       end do
       call norm_check(rnl, rwmesh, "lo")
+      call norm_check(rnl_mom, pwmesh, "lo")
     case("LO-2nl", "lo-2nl")
 #ifdef gauss_laguerre
       call fixed_point_quadrature("laguerre", NMesh, rmesh, rwmesh, weight_renorm=.false., &
@@ -444,7 +458,9 @@ contains
 #else
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
-      allocate(rnl(NMesh, 0:two%sps%emax/2, 0:two%sps%lmax))
+      call gauss_legendre(0.d0, rmax, pmesh, pwmesh, NMesh)
+      allocate(rnl(NMesh, 0:two%sps%emax, 0:two%sps%lmax))
+      allocate(rnl_mom(NMesh, 1:two%sps%emax, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
       do n = 0, two%sps%emax/2
         do l = 0, two%sps%lmax
@@ -455,10 +471,12 @@ contains
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
+            rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
           end do
         end do
       end do
       call norm_check(rnl, rwmesh, "HO")
+      call norm_check(rnl_mom, pwmesh, "HO")
     end select
     write(*,"(a,f12.6,a)") "Basis storing: ", omp_get_wtime() - ti, " sec"
     ti = omp_get_wtime()
@@ -534,9 +552,114 @@ contains
 
     this%kinetic%DMat = kine
     this%potential%DMat = U
+    call set_kinetic_relativistic_correction(this)
+    call set_Darwin_term(this)
+    call set_LS_term(this)
     call kine%fin()
     call U%fin()
   end subroutine set_one_body_part
+
+  subroutine set_kinetic_relativistic_correction(this)
+    use AtLibrary, only: alpha
+    class(AtomicHamil), intent(inout) :: this
+    integer :: a, b, i
+    type(EleOrbits), pointer :: sps
+    type(EleSingleParticleOrbit), pointer :: oa, ob
+    real(8) :: r, hw, zeta
+
+    zeta = this%ms%zeta
+    sps => this%ms%sps
+    do a = 1, sps%norbs
+      oa => sps%orb(a)
+      do b = 1, a
+        ob => sps%orb(b)
+        if(oa%j /= ob%j) cycle
+        if(oa%l /= ob%l) cycle
+        r = 0.d0
+        select case(sps%basis)
+        case("LO","lo","LO-2nl","lo-2nl")
+          do i = 1, NMesh
+            r = r + pwmesh(i) * rnl_mom(i,oa%n,oa%l) * rnl_mom(i,ob%n,ob%l) * &
+              & (pmesh(i)*zeta)**4 * 0.125d0 / alpha**2
+          end do
+        case default
+          write(*,*) "Relativistic correction with the selected basis function is not implemented"
+          return
+        end select
+        this%kinetic_p4%m(a,b) = r
+        this%kinetic_p4%m(b,a) = r
+      end do
+    end do
+  end subroutine set_kinetic_relativistic_correction
+
+  subroutine set_Darwin_term(this)
+    !
+    ! Assuming the nucleus is a point charge
+    !
+    use AtLibrary, only: pi, laguerre_radial_wf, alpha
+    class(AtomicHamil), intent(inout) :: this
+    integer :: a, b
+    type(EleOrbits), pointer :: sps
+    type(EleSingleParticleOrbit), pointer :: oa, ob
+    real(8) :: r, zeta
+
+    zeta = this%ms%zeta
+    sps => this%ms%sps
+    do a = 1, sps%norbs
+      oa => sps%orb(a)
+      do b = 1, a
+        ob => sps%orb(b)
+        if(oa%j /= ob%j) cycle
+        if(oa%l /= ob%l) cycle
+        if(oa%l /= 0) cycle
+        r = 0.d0
+        select case(sps%basis)
+        case("LO","lo","LO-2nl","lo-2nl")
+          r = 0.5d0 * pi * laguerre_radial_wf(oa%n,0,1.d0/zeta,0.d0) * laguerre_radial_wf(ob%n,0,1.d0/zeta,0.d0) / alpha**2
+        case default
+          write(*,*) "Darwin term with the selected basis function is not implemented"
+          return
+        end select
+        this%Darwin_term%m(a,b) = r
+        this%Darwin_term%m(b,a) = r
+      end do
+    end do
+  end subroutine set_Darwin_term
+
+  subroutine set_LS_term(this)
+    use AtLibrary, only: g_e, alpha
+    class(AtomicHamil), intent(inout) :: this
+    integer :: a, b, i
+    type(EleOrbits), pointer :: sps
+    type(EleSingleParticleOrbit), pointer :: oa, ob
+    real(8) :: r, zeta, ls
+
+    zeta = this%ms%zeta
+    sps => this%ms%sps
+    do a = 1, sps%norbs
+      oa => sps%orb(a)
+      do b = 1, a
+        ob => sps%orb(b)
+        if(oa%j /= ob%j) cycle
+        if(oa%l /= ob%l) cycle
+        if(oa%l == 0) cycle
+        ls = dble(oa%j)*0.5d0*(dble(oa%j)*0.5d0+1.d0) - dble(oa%l*(oa%l+1)) - 0.75d0
+        r = 0.d0
+        select case(sps%basis)
+        case("LO","lo","LO-2nl","lo-2nl")
+          do i = 1, NMesh
+            r = r + rnl(i,oa%n,oa%l) * rnl(i,ob%n,ob%l) * rwmesh(i) * zeta**3/ rmesh(i)**3
+          end do
+          r = r * ls * 0.25d0 * g_e / alpha**2
+        case default
+          write(*,*) "Darwin term with the selected basis function is not implemented"
+          return
+        end select
+        this%LS_term%m(a,b) = r
+        this%LS_term%m(b,a) = r
+      end do
+    end do
+  end subroutine set_LS_term
 
   subroutine set_two_body_part(this)
     use AtLibrary, only: gauss_legendre, ho_radial_wf_norm, hc, m_e
@@ -679,12 +802,14 @@ contains
 
     write(wunit, '(a)') '####### one-body term'
     write(wunit, '(i5, i3)') cnt, 0
-    write(wunit, '(a)') '### a, b, <a|t|b>, <a|1/r|b> (a.u.), <a|b>'
+    write(wunit, '(a)') '### a b <a|t|b> <a|1/r|b> <a|rel_corr|b> <a|Darwin|b> <a|LS|b> (a.u.), <a|b>'
     do bra = 1, sps%norbs
       do ket = 1, bra
         if(sps%orb(bra)%l /= sps%orb(ket)%l) cycle
         if(sps%orb(bra)%j /= sps%orb(ket)%j) cycle
-        write(wunit,'(2i5,3f18.8)') bra,ket, this%kinetic%m(bra,ket), this%potential%m(bra,ket), this%S%m(bra,ket)
+        write(wunit,'(2i5,6f18.10)') bra,ket, this%kinetic%m(bra,ket), this%potential%m(bra,ket), &
+          & this%kinetic_p4%m(bra,ket), this%Darwin_term%m(bra,ket), &
+          & this%LS_term%m(bra,ket), this%S%m(bra,ket)
         !write(wunit,'(2i5,3f18.8)') bra,ket, this%kinetic%m(bra,ket)*Eh, this%potential%m(bra,ket)*Eh, this%S%m(bra,ket)
       end do
     end do

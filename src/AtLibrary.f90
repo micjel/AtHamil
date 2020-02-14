@@ -6,6 +6,7 @@ module AtLibrary
   real(8), parameter, public :: hc = 197.32705d0         ! \hbar c [eV nm]
   real(8), parameter, public :: m_e = 510.9989461 ! electron mass [keV]
   real(8), parameter, public :: alpha = 137.035999d0     ! electric fine structure constant
+  real(8), parameter, public :: g_e =-2.002319304362d0  ! electron g-factor
   !
   ! C interfaces
   !
@@ -358,6 +359,24 @@ contains
     s = prefact * exp(exp_component) * laguerre(n-l-1,dble(2*l+1),x)
   end function hydrogen_radial_wf_norm
 
+  function Laguerre_radial_wf(n,l,b,r) result(s)
+    ! From Eq.(13) in A. E. McCoy and M. A. Caprio, J. Math. Phys. 57, (2016).
+    ! b is length scale [L]
+    integer,intent(in) :: n,l
+    real(8),intent(in) :: b,r
+    real(8) :: s
+    real(8) :: prefact, exp_component, x, x2
+    x = r / b
+    x2 = 2.d0 * x
+    prefact = sqrt( 2.d0 / b ) * 2.d0 / b
+    exp_component = 0.5d0*ln_gamma(dble(n+1)) - &
+        & 0.5d0*ln_gamma(dble(n+2*l+3)) - x
+    if(abs(x2) > 1.d-16) then
+      exp_component = exp_component  + dble(l)*log(x2)
+    end if
+    s = prefact * exp(exp_component) * laguerre(n,dble(2*l+2),x2)
+  end function Laguerre_radial_wf
+
   function Laguerre_radial_wf_norm(n,l,b,r) result(s)
     ! From Eq.(13) in A. E. McCoy and M. A. Caprio, J. Math. Phys. 57, (2016).
     ! b is length scale [L]
@@ -372,6 +391,25 @@ contains
         & 0.5d0*ln_gamma(dble(n+2*l+3)) - x  + dble(l+1) * log(x2)
     s = prefact * exp(exp_component) * laguerre(n,dble(2*l+2),x2)
   end function Laguerre_radial_wf_norm
+
+  function Mom_Laguerre_radial_wf_norm(n,l,b,p) result(s)
+    ! b is length scale [L]
+    integer,intent(in) :: n,l
+    real(8),intent(in) :: b,p
+    real(8) :: s
+    real(8) :: exp_prefact, exp_component, x, xi
+    integer :: k
+    xi = b * p * 0.5d0
+    x = 0.5d0 / sqrt(0.25d0 + xi*xi)
+    s = 0.d0
+    exp_prefact = 0.5d0*ln_gamma(dble(n+1)) + 0.5d0*ln_gamma(dble(n+2*l+3)) + &
+      & dble(2*l+3)*log(2.d0*x) + dble(l)*log(2.d0*xi) + ln_gamma(dble(l+1))
+    do k = 0, n
+      exp_component = dble(k)*log(2.d0*x) - ln_gamma(dble(n+1-k)) - ln_gamma(dble(2*l+k+3)) + exp_prefact
+      s = s + (-1.d0)**k * dble(k+1) * Gegenbauer_polynomial(k+1,dble(l+1),x) * exp(exp_component)
+    end do
+    s = s * sqrt(b / pi) * xi
+  end function Mom_Laguerre_radial_wf_norm
 
   function hydrogen_radial_wf_mom_norm(n,l,a_star,p) result(s)
     ! from wikipedia https://en.wikipedia.org/wiki/Hydrogen_atom
