@@ -41,6 +41,8 @@ module AtomicHamiltonian
   real(8), private, allocatable :: pmesh(:), pwmesh(:)
   integer, private :: NMesh = 100
   integer, private :: NMesh_Mom = 100
+  real(8), private :: rmax = 0.d0
+  real(8), private :: pmax = 0.d0
   real(8), private, allocatable :: rnl(:,:,:)
   real(8), private, allocatable :: rnl_mom(:,:,:)
   real(8), private :: a_0, Eh
@@ -86,6 +88,7 @@ contains
   end subroutine FinFNL
 
   subroutine InitFNL(this, ms)
+    use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm
     class(Fnl), intent(inout) :: this
     type(EleTwoBodySpace), intent(in) :: ms
     type(EleOrbits), pointer :: sps
@@ -99,6 +102,10 @@ contains
     integer :: cnt, i1, i2
     real(8) :: integral, r1, r2, log_r, zeta
     real(8), allocatable :: inter(:,:,:)
+    real(8), allocatable :: r_1(:), w_1(:)
+    real(8), allocatable :: r_2(:), w_2(:)
+    real(8) :: rmax_
+    integer :: n_1, n_2
 
 
     sps => ms%sps
@@ -189,10 +196,9 @@ contains
     !return ! test
     !
 
+    rmax_ = maxval(rmesh)
     allocate(inter(NMesh,0:2*lmax+1,this%nidx))
     inter(:,:,:) = 0.d0
-    !$omp parallel
-    !$omp do private(ket, n1, l1, n3, l3, L, i2, integral, i1, r1, r2, log_r)
     do ket = 1, this%nidx
       n1 = this%n1(ket)
       l1 = this%l1(ket)
@@ -204,18 +210,54 @@ contains
 
         do i2 = 1, NMesh
           r2 = rmesh(i2) / zeta
+          n_1 = max(int(rmesh(i2) / rmax_ * dble(NMesh)),NMesh/20)
+          n_2 = NMesh - n_1
+          call gauss_legendre(0.d0, rmesh(i2), r_1, w_1, n_1)
+          call gauss_legendre(rmesh(i2), rmax_, r_2, w_2, n_2)
           integral = 0.d0
-          do i1 = 1, NMesh
-            r1 = rmesh(i1) / zeta
-            log_r = dble(L) * log(min(r1,r2)) - dble(L+1) * log(max(r1,r2))
-            integral = integral + exp(log_r) * rnl(i1,n1,l1) * rnl(i1,n3,l3) * rwmesh(i1)
+          do i1 = 1, n_1
+            r1 = r_1(i1) / zeta
+            log_r = dble(L) * log(r1) - dble(L+1) * log(r2)
+            integral = integral + exp(log_r) * &
+              & laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) * laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+          end do
+          do i1 = 1, n_2
+            r1 = r_2(i1) / zeta
+            log_r = dble(L) * log(r2) - dble(L+1) * log(r1)
+            integral = integral + exp(log_r) * &
+              & laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) * laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
           end do
           inter(i2,L,ket) = integral
+          deallocate(r_1, w_1, r_2, w_2)
         end do
       end do
     end do
-    !$omp end do
-    !$omp end parallel
+    !!$omp parallel
+    !!$omp do private(ket, n1, l1, n3, l3, L, i2, integral, i1, r1, r2, log_r)
+    !do ket = 1, this%nidx
+    !  n1 = this%n1(ket)
+    !  l1 = this%l1(ket)
+    !  n3 = this%n2(ket)
+    !  l3 = this%l2(ket)
+    !  do L = abs(l1-l3)-1, l1+l3+1
+    !    if(L < 0) cycle
+    !    if(mod(l1 + l3 + L, 2) == 1) cycle
+
+    !    do i2 = 1, NMesh
+    !      r2 = rmesh(i2) / zeta
+    !      integral = 0.d0
+    !      do i1 = 1, NMesh
+    !        r1 = rmesh(i1) / zeta
+    !        log_r = dble(L) * log(min(r1,r2)) - dble(L+1) * log(max(r1,r2))
+    !        integral = integral + exp(log_r) * rnl(i1,n1,l1) * rnl(i1,n3,l3) * rwmesh(i1)
+    !      end do
+    !      inter(i2,L,ket) = integral
+    !    end do
+    !  end do
+    !end do
+    !!$omp end do
+    !!$omp end parallel
+
 
     !$omp parallel
     !$omp do private(bra, n1, l1, n3, l3, ket, n2, l2, n4, l4, lmin, lmax, &
@@ -379,7 +421,7 @@ contains
     end do
   end subroutine norm_check
 
-  subroutine SetAtomicHamil(this, NMesh, rmax, NMesh_mom, pmax)
+  subroutine SetAtomicHamil(this, NMesh_in, rmax_in, NMesh_mom_in, pmax_in)
     use AtLibrary, only: gauss_legendre, &
         & ho_radial_wf_norm, hydrogen_radial_wf_norm, &
         & hydrogen_radial_wf_mom_norm, &
@@ -387,12 +429,17 @@ contains
         & fixed_point_quadrature, ln_gamma, laguerre, &
         & Mom_laguerre_radial_wf_norm
     class(AtomicHamil), intent(inout) :: this
-    integer, intent(in) :: NMesh, NMesh_Mom
-    real(8), intent(in) :: rmax, pmax
+    integer, intent(in) :: NMesh_in, NMesh_Mom_in
+    real(8), intent(in) :: rmax_in, pmax_in
     type(EleTwoBodySpace), pointer :: two
     real(8) :: ti
     integer :: n, l, i
     logical :: error=.false.
+
+    NMesh = NMesh_in
+    NMesh_mom = NMesh_mom_in
+    rmax = rmax_in
+    pmax = pmax_in
 
     two => this%ms
     ti = omp_get_wtime()
@@ -450,7 +497,6 @@ contains
 #ifdef gauss_laguerre
             rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
               & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
-            !rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
