@@ -65,6 +65,29 @@ ifeq ($(strip $(HOST)),other)
   endif
 endif
 
+ifeq ($(strip $(HOST)),oak)
+  FDEP=makedepf90
+  FC=ifort
+  MKL=-L$(MKLROOT)/lib/ -L$(MKLROOT)/lib/intel64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -Wl,-rpath,$(MKLROOT)/lib -Wl,-rpath,$(MKLROOT)/../compiler/lib/
+  LFLAGS+= -I/usr/local/include -L/usr/local/lib
+  LFLAGS+= $(MKL) -lgsl -lz
+  FFLAGS= -O3
+  CFLAGS= -O3
+  FFLAGS+= -fopenmp
+  FFLAGS+= -Dsingle_precision
+  FFLAGS+= -DVERSION=\"$(VERSION)\"
+  ifeq ($(Gauss_Laguerre),on)
+    FFLAGS+= -Dgauss_laguerre
+  endif
+  ifeq ($(DEBUG_MODE),on)
+    DFLAGS+=-Wall -pedantic -fbounds-check -O -Wuninitialized -fbacktrace
+    #FDFLAGS+=-ffpe-trap=invalid,zero,overflow # Note: gsl larguerre signal
+    ifneq ($(OS), OSX)
+      DFLAGS+= -pg -g
+    endif
+  endif
+endif
+
 
 ifeq ($(DEBUG_MODE),on)
 endif
@@ -119,6 +142,9 @@ ifeq ($(strip $(HOST)),other)
   MODOUT=-J$(MODDIR)
 endif
 
+ifeq ($(strip $(HOST)),oak)
+  MODOUT=-module $(MODDIR)
+endif
 #--------------------------------------------------
 # Rules
 #--------------------------------------------------

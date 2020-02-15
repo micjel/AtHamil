@@ -13,6 +13,8 @@ module AtHamilInput
     character(:), allocatable :: basis ! Basis function HO, AO, LO
     integer :: NMesh
     real(8) :: rmax
+    integer :: NMesh_Mom
+    real(8) :: pmax
     character(:), allocatable :: file_name
     integer :: emax, e2max, lmax
     logical :: test_mode
@@ -29,6 +31,8 @@ contains
     real(8) :: zeta = 4.d0
     integer :: NMesh = 1000
     real(8) :: rmax=1.d3
+    integer :: NMesh_Mom = 1000
+    real(8) :: pmax=1.d3
     character(256) :: basis = "LO"
     character(512) :: file_name = "default"
     integer :: emax = 6
@@ -41,7 +45,7 @@ contains
     ! input file name
     character(512) :: inputfile
     namelist /input/ zeta, basis, file_name, emax, e2max, lmax, test_mode, count_memory, &
-        & rmax, NMesh
+        & rmax, NMesh, pmax, NMesh_Mom
     call getarg(1, inputfile)
     inquire(file = inputfile, exist = ex)
     if(.not.ex) then
@@ -60,6 +64,8 @@ contains
     params%basis = basis
     params%rmax = rmax
     params%Nmesh = NMesh
+    params%pmax = pmax
+    params%Nmesh_Mom = NMesh_Mom
     if(params%lmax==-1) params%lmax = params%emax
 
     params%count_memory = count_memory

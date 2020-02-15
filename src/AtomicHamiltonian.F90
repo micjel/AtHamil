@@ -40,6 +40,7 @@ module AtomicHamiltonian
   real(8), private, allocatable :: rmesh(:), rwmesh(:)
   real(8), private, allocatable :: pmesh(:), pwmesh(:)
   integer, private :: NMesh = 100
+  integer, private :: NMesh_Mom = 100
   real(8), private, allocatable :: rnl(:,:,:)
   real(8), private, allocatable :: rnl_mom(:,:,:)
   real(8), private :: a_0, Eh
@@ -378,7 +379,7 @@ contains
     end do
   end subroutine norm_check
 
-  subroutine SetAtomicHamil(this, NMesh, rmax)
+  subroutine SetAtomicHamil(this, NMesh, rmax, NMesh_mom, pmax)
     use AtLibrary, only: gauss_legendre, &
         & ho_radial_wf_norm, hydrogen_radial_wf_norm, &
         & hydrogen_radial_wf_mom_norm, &
@@ -386,16 +387,18 @@ contains
         & fixed_point_quadrature, ln_gamma, laguerre, &
         & Mom_laguerre_radial_wf_norm
     class(AtomicHamil), intent(inout) :: this
-    integer, intent(in) :: NMesh
-    real(8), intent(in) :: rmax
+    integer, intent(in) :: NMesh, NMesh_Mom
+    real(8), intent(in) :: rmax, pmax
     type(EleTwoBodySpace), pointer :: two
     real(8) :: ti
     integer :: n, l, i
+    logical :: error=.false.
 
     two => this%ms
     ti = omp_get_wtime()
     select case(two%sps%basis)
     case("HO", "ho")
+      write(*,*) "Using Gauss-Legendre quadrature"
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
       allocate(rnl(NMesh, 0:two%sps%emax/2, 0:two%sps%emax))
       rnl(:,:,:) = 0.d0
@@ -409,16 +412,19 @@ contains
 
       call norm_check(rnl, rwmesh, "HO")
     case("AO", "ao")
+      write(*,*) "Using Gauss-Legendre quadrature"
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
-      call gauss_legendre(0.d0, rmax, pmesh, pwmesh, NMesh)
+      call gauss_legendre(0.d0, pmax, pmesh, pwmesh, NMesh_Mom)
       allocate(rnl(NMesh, 1:two%sps%emax, 0:two%sps%lmax))
-      allocate(rnl_mom(NMesh, 1:two%sps%emax, 0:two%sps%lmax))
+      allocate(rnl_mom(NMesh_Mom, 1:two%sps%emax, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
       rnl_mom(:,:,:) = 0.d0
       do n = 1, two%sps%emax
         do l = 0, min(n-1,two%sps%lmax)
           do i = 1, NMesh
             rnl(i,n,l) = hydrogen_radial_wf_norm(n,l,1.d0,rmesh(i))
+          end do
+          do i = 1, NMesh_Mom
             rnl_mom(i,n,l) = hydrogen_radial_wf_mom_norm(n,l,1.d0,pmesh(i))
           end do
         end do
@@ -427,14 +433,16 @@ contains
       call norm_check(rnl_mom, pwmesh, "AO")
     case("LO", "lo")
 #ifdef gauss_laguerre
+      write(*,*) "Using Gauss-Laguerre quadrature"
       call fixed_point_quadrature("laguerre", NMesh, rmesh, rwmesh, weight_renorm=.false., &
         & a_in=0.d0, b_in=2.d0, alpha_in=0.d0)
 #else
+      write(*,*) "Using Gauss-Legendre quadrature"
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
-      call gauss_legendre(0.d0, rmax, pmesh, pwmesh, NMesh)
+      call gauss_legendre(0.d0, pmax, pmesh, pwmesh, NMesh_Mom)
       allocate(rnl(NMesh, 0:two%sps%emax, 0:two%sps%lmax))
-      allocate(rnl_mom(NMesh, 0:two%sps%emax, 0:two%sps%lmax))
+      allocate(rnl_mom(NMesh_Mom, 0:two%sps%emax, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
       do n = 0, two%sps%emax
         do l = 0, two%sps%lmax
@@ -442,9 +450,13 @@ contains
 #ifdef gauss_laguerre
             rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
               & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
+            !rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
+            rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
+          end do
+          do i = 1, NMesh_Mom
             rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
           end do
         end do
@@ -453,14 +465,16 @@ contains
       call norm_check(rnl_mom, pwmesh, "lo")
     case("LO-2nl", "lo-2nl")
 #ifdef gauss_laguerre
+      write(*,*) "Using Gauss-Laguerre quadrature"
       call fixed_point_quadrature("laguerre", NMesh, rmesh, rwmesh, weight_renorm=.false., &
           & a_in=0.d0, b_in=2.d0, alpha_in=0.d0)
 #else
+      write(*,*) "Using Gauss-Legendre quadrature"
       call gauss_legendre(0.d0, rmax, rmesh, rwmesh, NMesh)
 #endif
-      call gauss_legendre(0.d0, rmax, pmesh, pwmesh, NMesh)
+      call gauss_legendre(0.d0, pmax, pmesh, pwmesh, NMesh_Mom)
       allocate(rnl(NMesh, 0:two%sps%emax, 0:two%sps%lmax))
-      allocate(rnl_mom(NMesh, 1:two%sps%emax, 0:two%sps%lmax))
+      allocate(rnl_mom(NMesh_Mom, 1:two%sps%emax, 0:two%sps%lmax))
       rnl(:,:,:) = 0.d0
       do n = 0, two%sps%emax/2
         do l = 0, two%sps%lmax
@@ -471,6 +485,8 @@ contains
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
+          end do
+          do i = 1, NMesh_Mom
             rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
           end do
         end do
@@ -521,7 +537,7 @@ contains
           if(oa%n == ob%n+1) r = dsqrt(dble(ob%n + 1) * (dble(ob%n + ob%l) + 1.5d0))
           r = r * hw * 0.5d0
         case("AO","ao")
-          do i = 1, NMesh
+          do i = 1, NMesh_Mom
             r = r + rnl_mom(i,oa%n,oa%l) * rnl_mom(i,ob%n,ob%l) * &
                 & pwmesh(i) * (pmesh(i)*zeta)**2 * 0.5d0
           end do
@@ -578,7 +594,7 @@ contains
         r = 0.d0
         select case(sps%basis)
         case("LO","lo","LO-2nl","lo-2nl")
-          do i = 1, NMesh
+          do i = 1, NMesh_Mom
             r = r + pwmesh(i) * rnl_mom(i,oa%n,oa%l) * rnl_mom(i,ob%n,ob%l) * &
               & (pmesh(i)*zeta)**4 * 0.125d0 / alpha**2
           end do

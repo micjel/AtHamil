@@ -18,9 +18,9 @@ program AtHamil
   if(f == "default") f = h%GetFileName()
   if(isfile(f)) then
     write(*,"(a)") trim(f), " already exsits."
-    return
+    stop
   end if
-  call h%set(params%NMesh, params%rmax)
+  call h%set(params%NMesh, params%rmax, params%NMesh_Mom, params%pmax)
   call h%writef(f)
 
   call h%fin()
