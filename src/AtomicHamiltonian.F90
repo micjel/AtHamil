@@ -102,10 +102,12 @@ contains
     integer :: cnt, i1, i2
     real(8) :: integral, r1, r2, log_r, zeta
     real(8), allocatable :: inter(:,:,:)
-    real(8), allocatable :: r_1(:), w_1(:)
-    real(8), allocatable :: r_2(:), w_2(:)
+    real(8), allocatable, save :: r_1(:), w_1(:)
+    real(8), allocatable, save :: r_2(:), w_2(:)
+    real(8), allocatable, save :: Rnl1(:), Rnl2(:)
     real(8) :: rmax_
     integer :: n_1, n_2
+    !$omp threadprivate(r_1, w_1, r_2, w_2, Rnl1, Rnl2)
 
 
     sps => ms%sps
@@ -199,65 +201,50 @@ contains
     rmax_ = maxval(rmesh)
     allocate(inter(NMesh,0:2*lmax+1,this%nidx))
     inter(:,:,:) = 0.d0
-    do ket = 1, this%nidx
-      n1 = this%n1(ket)
-      l1 = this%l1(ket)
-      n3 = this%n2(ket)
-      l3 = this%l2(ket)
-      do L = abs(l1-l3)-1, l1+l3+1
-        if(L < 0) cycle
-        if(mod(l1 + l3 + L, 2) == 1) cycle
+    !$omp parallel
+    !$omp do private(i2, r2, n_1, n_2, ket, n1, l1, n3, l3, i1, L, integral, r1, log_r)
+    do i2 = 1, NMesh
+      r2 = rmesh(i2) / zeta
+      n_1 = max(int(rmesh(i2) / rmax_ * dble(NMesh)),NMesh/20)
+      n_2 = NMesh - n_1
+      call gauss_legendre(0.d0, rmesh(i2), r_1, w_1, n_1)
+      call gauss_legendre(rmesh(i2), rmax_, r_2, w_2, n_2)
+      allocate( Rnl1(n_1) )
+      allocate( Rnl2(n_2) )
+      do ket = 1, this%nidx
+        n1 = this%n1(ket)
+        l1 = this%l1(ket)
+        n3 = this%n2(ket)
+        l3 = this%l2(ket)
+        do i1 = 1, n_1
+          Rnl1(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) * laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+        end do
+        do i1 = 1, n_2
+          Rnl2(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) * laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
+        end do
 
-        do i2 = 1, NMesh
-          r2 = rmesh(i2) / zeta
-          n_1 = max(int(rmesh(i2) / rmax_ * dble(NMesh)),NMesh/20)
-          n_2 = NMesh - n_1
-          call gauss_legendre(0.d0, rmesh(i2), r_1, w_1, n_1)
-          call gauss_legendre(rmesh(i2), rmax_, r_2, w_2, n_2)
+        do L = abs(l1-l3)-1, l1+l3+1
+          if(L < 0) cycle
+          if(mod(l1 + l3 + L, 2) == 1) cycle
+
           integral = 0.d0
           do i1 = 1, n_1
             r1 = r_1(i1) / zeta
             log_r = dble(L) * log(r1) - dble(L+1) * log(r2)
-            integral = integral + exp(log_r) * &
-              & laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) * laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+            integral = integral + exp(log_r) * Rnl1(i1)
           end do
           do i1 = 1, n_2
             r1 = r_2(i1) / zeta
             log_r = dble(L) * log(r2) - dble(L+1) * log(r1)
-            integral = integral + exp(log_r) * &
-              & laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) * laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
+            integral = integral + exp(log_r) * Rnl2(i1)
           end do
           inter(i2,L,ket) = integral
-          deallocate(r_1, w_1, r_2, w_2)
         end do
       end do
+      deallocate(r_1, w_1, r_2, w_2, Rnl1, Rnl2)
     end do
-    !!$omp parallel
-    !!$omp do private(ket, n1, l1, n3, l3, L, i2, integral, i1, r1, r2, log_r)
-    !do ket = 1, this%nidx
-    !  n1 = this%n1(ket)
-    !  l1 = this%l1(ket)
-    !  n3 = this%n2(ket)
-    !  l3 = this%l2(ket)
-    !  do L = abs(l1-l3)-1, l1+l3+1
-    !    if(L < 0) cycle
-    !    if(mod(l1 + l3 + L, 2) == 1) cycle
-
-    !    do i2 = 1, NMesh
-    !      r2 = rmesh(i2) / zeta
-    !      integral = 0.d0
-    !      do i1 = 1, NMesh
-    !        r1 = rmesh(i1) / zeta
-    !        log_r = dble(L) * log(min(r1,r2)) - dble(L+1) * log(max(r1,r2))
-    !        integral = integral + exp(log_r) * rnl(i1,n1,l1) * rnl(i1,n3,l3) * rwmesh(i1)
-    !      end do
-    !      inter(i2,L,ket) = integral
-    !    end do
-    !  end do
-    !end do
-    !!$omp end do
-    !!$omp end parallel
-
+    !$omp end do
+    !$omp end parallel
 
     !$omp parallel
     !$omp do private(bra, n1, l1, n3, l3, ket, n2, l2, n4, l4, lmin, lmax, &
@@ -318,18 +305,14 @@ contains
     call this%kinetic_p4%fin()
     call this%Darwin_term%fin()
     call this%LS_term%fin()
-    select case(this%ms%sps%basis)
-    case("AO", "ao")
-      deallocate(pmesh)
-      deallocate(pwmesh)
-      deallocate(rnl_mom)
-    case default
-    end select
     this%ms => null()
     this%is_init = .false.
     deallocate(rmesh)
     deallocate(rwmesh)
+    deallocate(pmesh)
+    deallocate(pwmesh)
     deallocate(rnl)
+    deallocate(rnl_mom)
   end subroutine FinAtomicHamil
 
   subroutine InitAtomicHamil(this, two)
@@ -406,7 +389,7 @@ contains
           if(basis == "HO" .and. 2*nket+l > 2*(size(wf,2)-1)) cycle
 
           ovlp = 0.d0
-          do i = 1, NMesh
+          do i = 1, size(wmesh)
             ovlp = ovlp + wmesh(i) * wf(i,nbra,l) * wf(i,nket,l)
           end do
           if(nbra == nket .and. abs(1.d0-ovlp) > 1.d-4) then
@@ -434,7 +417,6 @@ contains
     type(EleTwoBodySpace), pointer :: two
     real(8) :: ti
     integer :: n, l, i
-    logical :: error=.false.
 
     NMesh = NMesh_in
     NMesh_mom = NMesh_mom_in
@@ -500,7 +482,6 @@ contains
 #else
             rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
 #endif
-            rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
           end do
           do i = 1, NMesh_Mom
             rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
@@ -627,7 +608,7 @@ contains
     integer :: a, b, i
     type(EleOrbits), pointer :: sps
     type(EleSingleParticleOrbit), pointer :: oa, ob
-    real(8) :: r, hw, zeta
+    real(8) :: r, zeta
 
     zeta = this%ms%zeta
     sps => this%ms%sps

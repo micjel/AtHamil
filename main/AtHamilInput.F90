@@ -28,10 +28,10 @@ module AtHamilInput
 contains
   subroutine InitInputParameters(params)
     class(InputParameters), intent(inout) :: params
-    real(8) :: zeta = 4.d0
-    integer :: NMesh = 1000
+    real(8) :: zeta = 1.d0
+    integer :: NMesh = 400
     real(8) :: rmax=1.d3
-    integer :: NMesh_Mom = 1000
+    integer :: NMesh_Mom = 400
     real(8) :: pmax=1.d3
     character(256) :: basis = "LO"
     character(512) :: file_name = "default"
