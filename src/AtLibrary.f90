@@ -6,7 +6,7 @@ module AtLibrary
   real(8), parameter, public :: hc = 197.32705d0         ! \hbar c [eV nm]
   real(8), parameter, public :: m_e = 510.9989461 ! electron mass [keV]
   real(8), parameter, public :: alpha = 137.035999d0     ! electric fine structure constant
-  real(8), parameter, public :: g_e =-2.002319304362d0  ! electron g-factor
+  real(8), parameter, public :: g_s = 2.002319304362d0  ! electron g-factor
   !
   ! C interfaces
   !

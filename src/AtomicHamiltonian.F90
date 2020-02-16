@@ -629,8 +629,8 @@ contains
           write(*,*) "Relativistic correction with the selected basis function is not implemented"
           return
         end select
-        this%kinetic_p4%m(a,b) = r
-        this%kinetic_p4%m(b,a) = r
+        this%kinetic_p4%m(a,b) = -r
+        this%kinetic_p4%m(b,a) = -r
       end do
     end do
   end subroutine set_kinetic_relativistic_correction
@@ -670,7 +670,7 @@ contains
   end subroutine set_Darwin_term
 
   subroutine set_LS_term(this)
-    use AtLibrary, only: g_e, alpha
+    use AtLibrary, only: g_s, alpha
     class(AtomicHamil), intent(inout) :: this
     integer :: a, b, i
     type(EleOrbits), pointer :: sps
@@ -693,7 +693,7 @@ contains
           do i = 1, NMesh
             r = r + rnl(i,oa%n,oa%l) * rnl(i,ob%n,ob%l) * rwmesh(i) * zeta**3/ rmesh(i)**3
           end do
-          r = r * ls * 0.25d0 * g_e / alpha**2
+          r = r * ls * 0.25d0 * g_s / alpha**2
         case default
           write(*,*) "Darwin term with the selected basis function is not implemented"
           return
