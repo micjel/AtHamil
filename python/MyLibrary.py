@@ -107,11 +107,15 @@ if(__name__=="__main__"):
     #for n1 in range(5):
     #    t2 = norm_laguerre_wave_function_mom(n1,n1,l)[0]
     #    print(n1, n1, t2)
-    for n1 in range(5):
-        for n2 in range(5):
-            t = T_laguerre_wave_function(n1,n2,l)
-            t2 = T_laguerre_wave_function_int(n1,n2,l)[0]
-            print(n1, n2, t-t2)
+    #for n1 in range(5):
+    #    for n2 in range(5):
+    #        t = T_laguerre_wave_function(n1,n2,l)
+    #        t2 = T_laguerre_wave_function_int(n1,n2,l)[0]
+    #        print(n1, n2, t-t2)
+    for l in range(10):
+        print( laguerre_wave_function(0.0, 1.0, 0, l) )
+    #for l in range(5):
+    #    print( laguerre_wave_function(0.0, 1.0, 3, l) )
 
     #print(thj(1,0,1,1,0,-1))
     #print(sjs(0,0,0,0,0,0))

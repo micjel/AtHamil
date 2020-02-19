@@ -658,7 +658,7 @@ contains
         r = 0.d0
         select case(sps%basis)
         case("LO","lo","LO-2nl","lo-2nl")
-          r = 0.5d0 * pi * laguerre_radial_wf(oa%n,0,1.d0/zeta,0.d0) * laguerre_radial_wf(ob%n,0,1.d0/zeta,0.d0) / alpha**2
+          r = 0.125d0 * laguerre_radial_wf(oa%n,0,1.d0/zeta,0.d0) * laguerre_radial_wf(ob%n,0,1.d0/zeta,0.d0) / alpha**2
         case default
           write(*,*) "Darwin term with the selected basis function is not implemented"
           return
