@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from MyLibrary import triangle, ee_laguerre_wave_function
+from MyLibrary import *
 from Orbits import ElectronOrbit, ElectronOrbits
 from TwoBodySpace import TwoBodyChannel, TwoBodySpace
 import numpy as np
@@ -9,6 +9,8 @@ def main():
     TwoBody = TwoBodySpace(Orbits)
     pot = TwoBodyOperator(TwoBody)
     pot.set_operator("coulomb", 0.5)
+    dar = TwoBodyOperator(TwoBody)
+    dar.set_operator("darwin", 0.5)
 
 class TwoBodyOperatorChannel:
     def __init__(self, chbra, chket):
@@ -31,6 +33,8 @@ class TwoBodyOperator:
     def set_operator(self, opname, zeta):
         if(opname == "coulomb"):
             self._set_coulomb_term(zeta)
+        if(opname == 'darwin'):
+            self._set_darwin_term(zeta)
 
     def SetME(self, a, b, c, d, Jab, Jcd, ME):
         if( triangle( self.rank_J, Jab, Jcd ) ): return
@@ -63,6 +67,31 @@ class TwoBodyOperator:
         bra = chbra.orbit_indices_to_index[(o1.index,o2.index)]
         ket = chket.orbit_indices_to_index[(o3.index,o4.index)]
         return self.channels[(ibra,iket)].mat[bra,ket] * chbra.phase[(o1.index,o2.index)] * chket.phase[(o3.index,o4.index)]
+
+    def _set_darwin_term(self, zeta):
+        for ch in self.space.get_channels():
+            j = ch.get_j()
+            for bra in range(ch.get_number_states()):
+                i1 = ch.index_to_orbit_index1[bra]
+                i2 = ch.index_to_orbit_index2[bra]
+                o1 = ch.Orbits.get_orbit(i1)
+                o2 = ch.Orbits.get_orbit(i2)
+                for ket in range(bra+1):
+                    i3 = ch.index_to_orbit_index1[ket]
+                    i4 = ch.index_to_orbit_index2[ket]
+                    o3 = ch.Orbits.get_orbit(i3)
+                    o4 = ch.Orbits.get_orbit(i4)
+
+                    norm = 1.0
+                    #if(i1==i2): norm /= np.sqrt(2.0)
+                    if(i3==i4): norm /= np.sqrt(2.0)
+                    me_abcd = two_body_darwin(o1,o2,o3,o4,j,zeta)
+                    me_abdc = two_body_darwin(o1,o2,o4,o3,j,zeta) * (1-2*(( (o3.j+o4.j)/2-j-1)%2))
+                    me = (me_abcd + me_abdc) * norm / np.sqrt(2.0)
+                    self.SetME(i1,i2,i3,i4,j,j,me)
+                    self.SetME(i3,i4,i1,i2,j,j,me)
+
+
 
     def _set_coulomb_term(self, zeta):
         for ch in self.space.get_channels():

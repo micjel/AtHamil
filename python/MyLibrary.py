@@ -97,6 +97,26 @@ def coulomb_F_laguerre_wave_function(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta):
             laguerre_wave_function(r1,zeta,n3,l3) * laguerre_wave_function(r2,zeta,n4,l4) * \
             r1*r1*r2*r2 * min(r1,r2)**L / max(r1,r2)**(L+1), 0, np.inf, lambda r1: 0, lambda r1: np.inf)
 
+def darwin_overlap_integral(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta):
+    return integrate.quad(lambda r1: \
+            laguerre_wave_function(r1,zeta,n1,l1) * laguerre_wave_function(r1,zeta,n2,l2) * \
+            laguerre_wave_function(r1,zeta,n3,l3) * laguerre_wave_function(r1,zeta,n4,l4) * \
+            r1*r1, 0, np.inf)
+
+
+def two_body_darwin(o1, o2, o3, o4, J, zeta):
+    r = 0.0
+    lmin = max( abs(o1.j-o3.j), abs(o2.j-o4.j) )//2
+    lmax = min(     o1.j+o3.j ,     o2.j+o4.j  )//2
+    integral = 0.0
+    for l in range(lmin,lmax+1):
+        if( (o1.l+o3.l+l)%2 == 1): continue
+        if( (o2.l+o4.l+l)%2 == 1): continue
+        integral = darwin_overlap_integral(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta)[0]
+        r += integral * sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*l) * thj(o1.j, 2*l, o3.j, -1, 0, 1) * thj(o2.j, 2*l, o4.j, -1, 0, 1)
+    return r * np.sqrt( (o1.j+1) * (o2.j+1) * (o3.j+1) * (o4.j+1) ) * (1-2*( ( (o1.j+o3.j)/2+J)%2 ) ) / (4*c*c)
+
+
 def ee_laguerre_wave_function(o1,o2,o3,o4,J,zeta):
     """
     electron-electron interaction
