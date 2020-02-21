@@ -6,6 +6,9 @@ from sympy import N
 from scipy.special import gamma, assoc_laguerre, eval_gegenbauer
 from scipy import integrate
 from Orbits import ElectronOrbit
+
+c = 137.035999084
+g = 2.00231930436256
 def triangle(J1,J2,J3):
     """
     triangular condition
@@ -55,10 +58,11 @@ def norm_laguerre_wave_function_mom(n1, n2, l):
     """
     return integrate.quad(lambda x: laguerre_wave_function_mom(x, 1.0, n1, l) * laguerre_wave_function_mom(x, 1.0, n2, l) * x*x, 0, np.inf)
 
-def T_laguerre_wave_function_int(n1, n2, l):
+def rel_laguerre_wave_function_int(n1, n2, l):
     """
     """
-    return integrate.quad(lambda x: laguerre_wave_function_mom(x, 1.0, n1, l) * laguerre_wave_function_mom(x, 1.0, n2, l) * x*x*x*x*0.5, 0, np.inf)
+    return integrate.quad(lambda x: laguerre_wave_function_mom(x, 1.0, n1, l) * laguerre_wave_function_mom(x, 1.0, n2, l) * x*x*x*x*x*x*0.125/(c*c), 0, np.inf)[0]
+
 
 def T_laguerre_wave_function(n1, n2, l):
     """
@@ -76,6 +80,13 @@ def Coul_laguerre_wave_function1(n1, n2, l, zeta):
     Nucleus-electron potential
     """
     return integrate.quad(lambda x: laguerre_wave_function(x, zeta, n1, l) * laguerre_wave_function(x, zeta, n2, l) * x, 0, np.inf)
+
+def darwin_term(n1, n2, zeta):
+    return laguerre_wave_function(0, zeta, n1, 0) * laguerre_wave_function(0, zeta, n2, 0)/(8*c*c)
+
+def spin_orb(n1, n2, l, j, zeta):
+    integral = integrate.quad(lambda x: laguerre_wave_function(x, zeta, n1, l) * laguerre_wave_function(x, zeta, n2, l)/(x), 1e-10, np.inf)[0]
+    return g*(0.5*j*(0.5*j + 1) - l*(l+1) - 0.75)*integral/(4*c*c)
 
 def coulomb_F_laguerre_wave_function(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta):
     """
@@ -107,13 +118,11 @@ if(__name__=="__main__"):
     #for n1 in range(5):
     #    t2 = norm_laguerre_wave_function_mom(n1,n1,l)[0]
     #    print(n1, n1, t2)
-    #for n1 in range(5):
-    #    for n2 in range(5):
-    #        t = T_laguerre_wave_function(n1,n2,l)
-    #        t2 = T_laguerre_wave_function_int(n1,n2,l)[0]
-    #        print(n1, n2, t-t2)
-    for l in range(10):
-        print( laguerre_wave_function(0.0, 1.0, 0, l) )
+    for n1 in range(5):
+        for n2 in range(5):
+            t = T_laguerre_wave_function(n1,n2,l)
+            t2 = T_laguerre_wave_function_int(n1,n2,l)[0]
+            print(n1, n2, t-t2)
     #for l in range(5):
     #    print( laguerre_wave_function(0.0, 1.0, 3, l) )
 

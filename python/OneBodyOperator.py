@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from MyLibrary import triangle, T_laguerre_wave_function, Coul_laguerre_wave_function1
+from MyLibrary import *
 from Orbits import ElectronOrbit, ElectronOrbits
 from OneBodySpace import OneBodyChannel, OneBodySpace
 import numpy as np
@@ -11,6 +11,14 @@ def main():
     kin.set_operator("kinetic",2)
     pot = OneBodyOperator(OneBody)
     pot.set_operator("coulomb",2)
+    rel = OneBodyOperator(OneBody)
+    rel.set_operator("rel_corr",2)
+    so  = OneBodyOperator(OneBody)
+    sp.set_operator("spin_orb",2)
+    dar = OneBodyOperator(OneBody)
+    dar.set_operator("darwin",2)
+
+
 
 class OneBodyOperatorChannel:
     def __init__(self, chbra, chket):
@@ -35,6 +43,14 @@ class OneBodyOperator:
             self._set_kinetic_term(zeta)
         if(opname == "coulomb"):
             self._set_coulomb_term(zeta)
+        if(opname == "darwin"):
+            self._set_darwin_term(zeta)
+        if(opname == "spin_orb"):
+            self._set_spin_orb_term(zeta)
+        if(opname == "rel_corr"):
+            self._set_rel_corr_term(zeta)
+
+
     def _set_kinetic_term(self, zeta):
         orbs = self.space.Orbits
         for o1 in orbs.get_orbits():
@@ -43,6 +59,38 @@ class OneBodyOperator:
                 if( o1.l != o2.l  ): continue
                 me = T_laguerre_wave_function(o1.n, o2.n, o1.l) / zeta**2
                 self.SetME( o1.index, o2.index, me )
+
+    def _set_rel_corr_term(self, zeta):
+        orbs = self.space.Orbits
+        for o1 in orbs.get_orbits():
+            for o2 in orbs.get_orbits():
+                if( o1.j != o2.j  ): continue
+                if( o1.l != o2.l  ): continue
+                me = rel_laguerre_wave_function_int(o1.n, o2.n, o1.l) / zeta**4
+                self.SetME( o1.index, o2.index, me )
+    
+    def _set_spin_orb_term(self, zeta):
+        orbs = self.space.Orbits
+        for o1 in orbs.get_orbits():
+            for o2 in orbs.get_orbits():
+                if( o1.j != o2.j  ): continue
+                if( o1.l != o2.l  ): continue
+                me = spin_orb(o1.n, o2.n, o1.l, o1.j, zeta)
+                self.SetME( o1.index, o2.index, me )
+
+
+
+    def _set_darwin_term(self, zeta):
+        orbs = self.space.Orbits
+        for o1 in orbs.get_orbits():
+            for o2 in orbs.get_orbits():
+                if( o1.j != o2.j  ): continue
+                if( o1.l != o2.l  ): continue
+                if (o1.l != 0 ): continue
+                me = darwin_term(o1.n, o2.n,zeta)
+                self.SetME( o1.index, o2.index, me )
+
+
     def _set_coulomb_term(self, zeta):
         orbs = self.space.Orbits
         for o1 in orbs.get_orbits():
