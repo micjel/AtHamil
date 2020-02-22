@@ -9,7 +9,7 @@ def main():
     ms = ModelSpace(emax=1, zeta=1)
     Ham = Operator(ms)
     #Ham.set_operator("kinetic")
-    Ham.set_operator("darwin")
+    Ham.set_operator("spin_contact")
     for chan in Ham.OneBody.channels.values():
         print(chan.mat)
     for chan in Ham.TwoBody.channels.values():
