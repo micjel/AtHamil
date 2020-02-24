@@ -117,6 +117,19 @@ def Rkk_one_body(o1, o2, k):
     return total*(2*k+1)*(-1**(o1.j/2.+o2.j/2.+k))
 
 
+def Ck_dot_Rkk(o1, o2, o3, o4, J, k):
+    return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
+
+
+def Rkk_dot_Rkk(o1, o2, o3, o4, J, k):
+    return Rkk_one_body(o1, o3, k)*Rkk_one_body(o2, o4, k)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
+
+def Ck_dot_Rkmin1k(o1, o2, o3, o4, J, k):
+    return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
+
+def Rkmin1k_dot_Rkmin1k(o1, o2, o3, o4, J, k):
+    return Rkk_one_body(o1, o3, k-1)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2
+
 def spin_harmonic_decouple(l1, j1, l2, j2, k, L):
     sum_j = 0
     for j in np.arange(np.abs(j1-1), j1+2):
