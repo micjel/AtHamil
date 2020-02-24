@@ -97,6 +97,25 @@ def coulomb_F_laguerre_wave_function(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta):
             laguerre_wave_function(r1,zeta,n3,l3) * laguerre_wave_function(r2,zeta,n4,l4) * \
             r1*r1*r2*r2 * min(r1,r2)**L / max(r1,r2)**(L+1), 0, np.inf, lambda r1: 0, lambda r1: np.inf)
 
+def Ck_one_body(j1, l1, j2,  l2, k):
+    '''
+    <j1||Ck||j2>
+    '''
+    if (l1+l2+k)%2==1: return 0
+    return thj(j1, j2, 2*k, 1, -1, 0)*np.sqrt((j1+1)*(j2+1))*(-1**(j2/2.+k-0.5))
+
+def Rkk_one_body(o1, o2, k):
+    '''
+    <j1||R(k,k)||j2>
+    '''
+    total = 0.
+    for j in np.arange(np.abs(o2.j/2. - 1), o2.j/2. + 1):
+        for l in np.arange(np.abs(j-0.5), j+1.5):
+            if l!=o2.l: continue
+            total+=Ck_one_body(o1.j, o1.l, 2*j, l, k)*sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j) * \
+                    np.sqrt((2*j+1)*(o2.j+1)*l*(l+1)*(2*l+1))*(-1**(l+o2.j/2.+1.5))*sjs(2*l, 2*l, 2, o2.j, 2*j, 1)
+    return total*(2*k+1)*(-1**(o1.j/2.+o2.j/2.+k))
+
 
 def spin_harmonic_decouple(l1, j1, l2, j2, k, L):
     sum_j = 0
