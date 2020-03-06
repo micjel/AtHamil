@@ -110,12 +110,54 @@ def Rkk_one_body(o1, o2, k):
     '''
     total = 0.
     for j in np.arange(np.abs(o2.j/2. - 1), o2.j/2. + 1):
-        for l in np.arange(np.abs(j-0.5), j+1.5):
-            if l!=o2.l: continue
-            total+=Ck_one_body(o1.j, o1.l, 2*j, l, k)*sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j) * \
+        l = o2.l
+        total+=Ck_one_body(o1.j, o1.l, 2*j, l, k)*sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j) * \
                     np.sqrt((2*j+1)*(o2.j+1)*l*(l+1)*(2*l+1))*(-1**(l+o2.j/2.+1.5))*sjs(2*l, 2*l, 2, o2.j, 2*j, 1)
     return total*(2*k+1)*(-1**(o1.j/2.+o2.j/2.+k))
 
+def Rkk_one_body(j1, l1, j2, l2,  k):             #function overloaded for diff input formats
+    '''
+    <j1||R(k,k)||j2>  
+    '''
+    total = 0.
+    for j in np.arange(np.abs(j2/2. - 1), j2/2. + 1):
+        total+=Ck_one_body(j1, l1, 2*j, l2, k)*sjs(2*k, 2, 2*k, j2, j1, 2*j) * \
+                    np.sqrt((2*j+1)*(j2+1)*l2*(l2+1)*(2*l2+1))*(-1**(l2+j2/2.+1.5))*sjs(2*l2, 2*l2, 2, j2, 2*j, 1)
+    return total*(2*k+1)*(-1**(j1/2.+j2/2.+k))
+
+
+def Ck_cross_s(o1, o2, k):
+    '''
+    <j1||[Ck x S1]k||j2>
+    '''
+    total = 0.
+    for j in np.araneg(np.abs(o2.j/2. -1), o2.j/2.+1):
+        total+=sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j)*Ck_one_body(o1.j, o1.l, 2*j, o2.l, k)*np.sqrt(6*(o2.j+1)*(2*j+1))*(-1**(o2.l+j+1.5))*sjs(1, 1, 2, o2.j, 2*j, 2*o2.l)
+    return total*np.sqrt(2*k+1)*(-1**(k+o1.j/2.+o2.j/2.))
+
+
+def Rkk_cross_s(o1, o2, k):
+    '''
+    <j1||[R(k,k) x S1]k||j2>
+    '''
+    total = 0.
+    for j in np.araneg(np.abs(o2.j/2. -1), o2.j/2.+1):
+        total+=sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j)*Rkk_one_body(o1.j, o1.l, 2*j, o2.l, k)*np.sqrt(6*(o2.j+1)*(2*j+1))*(-1**(o2.l+j+1.5))*sjs(1, 1, 2, o2.j, 2*j, 2*o2.l)
+    return total*np.sqrt(2*k+1)*(-1**(k+o1.j/2.+o2.j/2.))
+
+
+def Rkk1_cross_Ck2_dot_S1(o1, o2, o3, o4, J, k):
+    return -Rkk_cross_s(o1, o3, k)*Ck_one_body(o2.j, o2.l, o4.j, o4.l, k)/(3*(2*k+1)*np.sqrt(2*J+1))
+
+def Rkmin1k1_cross_Ckmin12_dot_S1(o1, o2, o3, o4, J, k):
+    return -Rkk_cross_s(o1, o3, k-1)*Ck_one_body(o2.j, o2.l, o4.j, o4.l, k-1)/(3*(2*k+1)*np.sqrt(2*J+1))
+
+def Rkpls1k1_cross_Ckpls12_dot_S1(o1, o2, o3, o4, J, k):
+    return -Rkk_cross_s(o1, o3, k+1)*Ck_one_body(o2.j, o2.l, o4.j, o4.l, k+1)/(3*(2*k+1)*np.sqrt(2*J+1))
+
+
+def Ck1_cross_Ck2_dot_S1(o1, o2, o3, o4, J, k):
+    return -Ck_cross_s(o1, o3, k)*Ck_one_body(o2.j, o2.l, o4.j, o4.l, k)/(3*(2*k+1)*np.sqrt(2*J+1))
 
 def Ck_dot_Rkk(o1, o2, o3, o4, J, k):
     return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
