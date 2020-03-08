@@ -117,7 +117,7 @@ def Rkk_one_body(o1, o2, k):
 
 def Rkk_one_body(j1, l1, j2, l2,  k):             #function overloaded for diff input formats
     '''
-    <j1||R(k,k)||j2>  
+    <j1||R(k,k)||j2>
     '''
     total = 0.
     for j in np.arange(np.abs(j2/2. - 1), j2/2. + 1):

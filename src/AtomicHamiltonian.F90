@@ -11,7 +11,12 @@ module AtomicHamiltonian
   end type AtomicHamilChan
 
   type :: AtomicHamil
-    type(AtomicHamilChan), allocatable :: MatCh(:,:)
+    type(AtomicHamilChan), allocatable :: ee_coulomb(:,:)
+    type(AtomicHamilChan), allocatable :: ee_darwin(:,:)
+    type(AtomicHamilChan), allocatable :: ee_spin_contact(:,:)
+    type(AtomicHamilChan), allocatable :: ee_spin_orbit(:,:)
+    type(AtomicHamilChan), allocatable :: ee_orbit_orbit(:,:)
+    type(AtomicHamilChan), allocatable :: ee_spin_dipole(:,:)
     type(AtomicHamilChan) :: kinetic
     type(AtomicHamilChan) :: potential
     type(AtomicHamilChan) :: kinetic_p4  ! relativistic correction for kinetic term
@@ -49,6 +54,7 @@ module AtomicHamiltonian
 
   type, private :: FL
     real(8), allocatable :: F(:)
+    real(8), allocatable :: Contact(:)
   end type FL
 
   type, private :: Fnl
@@ -63,9 +69,9 @@ module AtomicHamiltonian
     procedure :: InitFNL
     procedure :: FinFNL
     procedure :: GetFNL
+    procedure :: GetFNLContact
     generic :: init => InitFNL
     generic :: fin => FinFNL
-    generic :: get => GetFNL
   end type Fnl
   type(Fnl) :: Fintegral
 
@@ -77,6 +83,7 @@ contains
     do bra = 1, this%nidx
       do ket = 1, this%nidx
         deallocate(this%bk(bra,ket)%F)
+        deallocate(this%bk(bra,ket)%Contact)
       end do
     end do
     deallocate(this%bk)
@@ -191,7 +198,9 @@ contains
         lmin = max(abs(l1-l3)-1, abs(l2-l4)-1,0)
         lmax = min(abs(l1+l3), abs(l2+l4)) + 1
         allocate(this%bk(bra,ket)%F(lmin:lmax))
+        allocate(this%bk(bra,ket)%Contact(lmin:lmax))
         this%bk(bra,ket)%F(:) = 0.d0
+        this%bk(bra,ket)%Contact(:) = 0.d0
       end do
     end do
     !
@@ -278,6 +287,41 @@ contains
     end do
     !$omp end do
     !$omp end parallel
+
+    !$omp parallel
+    !$omp do private(bra, n1, l1, n3, l3, ket, n2, l2, n4, l4, lmin, lmax, &
+    !$omp &          L, integral, i1)
+    do bra = 1, this%nidx
+      n1 = this%n1(bra)
+      l1 = this%l1(bra)
+      n3 = this%n2(bra)
+      l3 = this%l2(bra)
+      do ket = 1, this%nidx
+        n2 = this%n1(ket)
+        l2 = this%l1(ket)
+        n4 = this%n2(ket)
+        l4 = this%l2(ket)
+        lmin = max(abs(l1-l3)-1, abs(l2-l4)-1, 0)
+        lmax = min(l1+l3, l2+l4) + 1
+        do L = lmin, lmax
+          if(L < 0) cycle
+          if(mod(l1 + l3 + L, 2) == 1) cycle
+          if(mod(l2 + l4 + L, 2) == 1) cycle
+          integral = 0.d0
+          do i1 = 1, NMesh
+            integral = integral + rwmesh(i1) * &
+                & rnl(i1,n1,l1) * rnl(i1,n3,l3) * rnl(i1,n2,l2) * rnl(i1,n4,l4) * (zeta/rmesh(i1))**2
+          end do
+          this%bk(bra,ket)%Contact(L) = integral
+          !!$omp critical
+          !write(*,"(9i3,f12.6)") n1,l1,n2,l2,n3,l3,n4,l4,L,integral
+          !!$omp end critical
+          !write(*,*) bra, ket, L, integral
+        end do
+      end do
+    end do
+    !$omp end do
+    !$omp end parallel
     deallocate(inter)
   end subroutine InitFNL
 
@@ -291,15 +335,36 @@ contains
     r = this%bk(bra,ket)%F(L)
   end function GetFNL
 
+  function GetFNLContact(this, n1, l1, n2, l2, n3, l3, n4, l4, L) result(r)
+    class(Fnl), intent(in) :: this
+    integer, intent(in) :: n1, l1, n2, l2, n3, l3, n4, l4, L
+    integer :: bra, ket
+    real(8) :: r
+    bra = this%idx(n1,l1,n3,l3)
+    ket = this%idx(n2,l2,n4,l4)
+    r = this%bk(bra,ket)%Contact(L)
+  end function GetFNLContact
+
   subroutine FinAtomicHamil(this)
     class(AtomicHamil), intent(inout) :: this
     integer :: chbra, chket
     call Fintegral%FinFNL()
     do chbra = 1, this%ms%NChan
       do chket = 1, this%ms%NChan
-        call this%MatCh(chbra,chket)%fin()
+        call this%ee_coulomb(chbra,chket)%fin()
+        call this%ee_darwin(chbra,chket)%fin()
+        call this%ee_spin_contact(chbra,chket)%fin()
+        call this%ee_spin_orbit(chbra,chket)%fin()
+        call this%ee_orbit_orbit(chbra,chket)%fin()
+        call this%ee_spin_dipole(chbra,chket)%fin()
       end do
     end do
+    deallocate(this%ee_coulomb)
+    deallocate(this%ee_darwin)
+    deallocate(this%ee_spin_contact)
+    deallocate(this%ee_spin_orbit)
+    deallocate(this%ee_orbit_orbit)
+    deallocate(this%ee_spin_dipole)
     call this%kinetic%fin()
     call this%potential%fin()
     call this%kinetic_p4%fin()
@@ -322,9 +387,14 @@ contains
     integer :: chbra, chket
     integer :: nb, jb, pb
     integer :: nk, jk, pk
-    if(allocated(this%MatCh)) call this%fin()
+    if(allocated(this%ee_coulomb)) call this%fin()
     this%ms => two
-    allocate(this%MatCh(two%NChan, two%NChan))
+    allocate(this%ee_coulomb(two%NChan, two%NChan))
+    allocate(this%ee_darwin(two%NChan, two%NChan))
+    allocate(this%ee_spin_contact(two%NChan, two%NChan))
+    allocate(this%ee_spin_orbit(two%NChan, two%NChan))
+    allocate(this%ee_orbit_orbit(two%NChan, two%NChan))
+    allocate(this%ee_spin_dipole(two%NChan, two%NChan))
     do chbra = 1, two%NChan
       nb = this%ms%jp(chbra)%n_state
       jb = this%ms%jp(chbra)%j
@@ -335,8 +405,18 @@ contains
         pk = this%ms%jp(chket)%p
         if(jb /= jk) cycle
         if(pb /= pk) cycle
-        this%MatCh(chbra,chket)%Zero = .false.
-        call this%MatCh(chbra, chket)%zeros(nb,nk)
+        this%ee_coulomb(chbra,chket)%Zero = .false.
+        this%ee_darwin(chbra,chket)%Zero = .false.
+        this%ee_spin_contact(chbra,chket)%Zero = .false.
+        this%ee_spin_orbit(chbra,chket)%Zero = .false.
+        this%ee_orbit_orbit(chbra,chket)%Zero = .false.
+        this%ee_spin_dipole(chbra,chket)%Zero = .false.
+        call this%ee_coulomb(chbra, chket)%zeros(nb,nk)
+        call this%ee_darwin(chbra, chket)%zeros(nb,nk)
+        call this%ee_spin_contact(chbra, chket)%zeros(nb,nk)
+        call this%ee_spin_orbit(chbra, chket)%zeros(nb,nk)
+        call this%ee_orbit_orbit(chbra, chket)%zeros(nb,nk)
+        call this%ee_spin_dipole(chbra, chket)%zeros(nb,nk)
       end do
     end do
     this%kinetic%Zero = .false.
@@ -705,7 +785,13 @@ contains
   end subroutine set_LS_term
 
   subroutine set_two_body_part(this)
-    use AtLibrary, only: gauss_legendre, ho_radial_wf_norm, hc, m_e
+    class(AtomicHamil), intent(inout) :: this
+
+    call set_ee_coulomb(this)
+    call set_ee_darwin(this)
+  end subroutine set_two_body_part
+
+  subroutine set_ee_coulomb(this)
     class(AtomicHamil), intent(inout) :: this
     type(EleOrbits), pointer :: sps
     type(EleSingleParticleOrbit), pointer :: oa, ob, oc, od
@@ -737,15 +823,100 @@ contains
           rbacd = ee_interaction(ob, oa, oc, od, J) * (-1.d0)**((oa%j+ob%j)/2-J-1)
           rabdc = ee_interaction(oa, ob, od, oc, J) * (-1.d0)**((oc%j+od%j)/2-J-1)
           rbadc = ee_interaction(ob, oa, od, oc, J) * (-1.d0)**((oa%j+ob%j+oc%j+od%j)/2)
-          this%MatCh(ch,ch)%m(bra,ket) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
-          this%MatCh(ch,ch)%m(ket,bra) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+          this%ee_coulomb(ch,ch)%m(bra,ket) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+          this%ee_coulomb(ch,ch)%m(ket,bra) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
         end do
       end do
       !$omp end do
       !$omp end parallel
     end do
+  end subroutine set_ee_coulomb
 
-  end subroutine set_two_body_part
+  subroutine set_ee_darwin(this)
+    use AtLibrary, only: alpha
+    class(AtomicHamil), intent(inout) :: this
+    type(EleOrbits), pointer :: sps
+    type(EleSingleParticleOrbit), pointer :: oa, ob, oc, od
+    integer :: bra, ket, a, b, c, d, J
+    integer :: ch
+    real(8) :: rabcd, rbacd, rabdc, rbadc, norm
+
+    sps => this%ms%sps
+    do ch = 1, this%ms%NChan
+      J = this%ms%jp(ch)%j
+      !$omp parallel
+      !$omp do private(bra, a, b, oa, ob, ket, c, d, oc, od, norm, &
+      !$omp &          rabcd, rbacd, rabdc, rbadc)
+      do bra = 1, this%ms%jp(ch)%n_state
+        a = this%ms%jp(ch)%n2label1(bra)
+        b = this%ms%jp(ch)%n2label2(bra)
+        oa => sps%orb(a)
+        ob => sps%orb(b)
+        do ket = 1, bra
+          c = this%ms%jp(ch)%n2label1(ket)
+          d = this%ms%jp(ch)%n2label2(ket)
+          oc => sps%orb(c)
+          od => sps%orb(d)
+
+          norm = 1.d0
+          if(a == b) norm = norm * dsqrt(0.5d0)
+          if(c == d) norm = norm * dsqrt(0.5d0)
+          rabcd = ee_interaction_darwin(oa, ob, oc, od, J)
+          rbacd = ee_interaction_darwin(ob, oa, oc, od, J) * (-1.d0)**((oa%j+ob%j)/2-J-1)
+          rabdc = ee_interaction_darwin(oa, ob, od, oc, J) * (-1.d0)**((oc%j+od%j)/2-J-1)
+          rbadc = ee_interaction_darwin(ob, oa, od, oc, J) * (-1.d0)**((oa%j+ob%j+oc%j+od%j)/2)
+          this%ee_darwin(ch,ch)%m(bra,ket) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+          this%ee_darwin(ch,ch)%m(ket,bra) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+      this%ee_darwin(ch,ch)%m(:,:) = this%ee_darwin(ch,ch)%m(:,:) * 0.25d0 / alpha**2
+    end do
+  end subroutine set_ee_darwin
+
+  subroutine set_ee_spin_contact(this)
+    use AtLibrary, only: alpha
+    class(AtomicHamil), intent(inout) :: this
+    type(EleOrbits), pointer :: sps
+    type(EleSingleParticleOrbit), pointer :: oa, ob, oc, od
+    integer :: bra, ket, a, b, c, d, J
+    integer :: ch
+    real(8) :: rabcd, rbacd, rabdc, rbadc, norm
+
+    sps => this%ms%sps
+    do ch = 1, this%ms%NChan
+      J = this%ms%jp(ch)%j
+      !$omp parallel
+      !$omp do private(bra, a, b, oa, ob, ket, c, d, oc, od, norm, &
+      !$omp &          rabcd, rbacd, rabdc, rbadc)
+      do bra = 1, this%ms%jp(ch)%n_state
+        a = this%ms%jp(ch)%n2label1(bra)
+        b = this%ms%jp(ch)%n2label2(bra)
+        oa => sps%orb(a)
+        ob => sps%orb(b)
+        do ket = 1, bra
+          c = this%ms%jp(ch)%n2label1(ket)
+          d = this%ms%jp(ch)%n2label2(ket)
+          oc => sps%orb(c)
+          od => sps%orb(d)
+
+          norm = 1.d0
+          if(a == b) norm = norm * dsqrt(0.5d0)
+          if(c == d) norm = norm * dsqrt(0.5d0)
+          rabcd = ee_interaction_spin_contact(oa, ob, oc, od, J)
+          rbacd = ee_interaction_spin_contact(ob, oa, oc, od, J) * (-1.d0)**((oa%j+ob%j)/2-J-1)
+          rabdc = ee_interaction_spin_contact(oa, ob, od, oc, J) * (-1.d0)**((oc%j+od%j)/2-J-1)
+          rbadc = ee_interaction_spin_contact(ob, oa, od, oc, J) * (-1.d0)**((oa%j+ob%j+oc%j+od%j)/2)
+          this%ee_spin_contact(ch,ch)%m(bra,ket) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+          this%ee_spin_contact(ch,ch)%m(ket,bra) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+        end do
+      end do
+      !$omp end do
+      !$omp end parallel
+      this%ee_spin_contact(ch,ch)%m(:,:) = this%ee_spin_contact(ch,ch)%m(:,:) * 2.d0 / (3.d0*alpha**2)
+    end do
+  end subroutine set_ee_spin_contact
 
   function ee_interaction(oa, ob, oc, od, J) result(r)
     use AtLibrary, only: tjs, sjs
@@ -753,8 +924,6 @@ contains
     integer, intent(in) :: J
     real(8) :: r
     integer :: Lmin, Lmax, L
-    !integer :: i1, i2
-    !real(8) :: r1, r2
     real(8) :: integral
     Lmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
     Lmax = min(   (oa%j+oc%j),    (ob%j+od%j))/2
@@ -762,19 +931,8 @@ contains
     do L = Lmin, Lmax
       if(mod(oa%l + oc%l + L, 2) == 1) cycle
       if(mod(ob%l + od%l + L, 2) == 1) cycle
-      !integral = 0.d0
-      !do i1 = 1, NMesh
-      !  do i2 = 1, NMesh
-      !    r1 = rmesh(i1)
-      !    r2 = rmesh(i2)
-      !    integral = integral + rnlee(i1,oa%n,oa%l) * rnlee(i2,ob%n,ob%l) * &
-      !        & rnlee(i1,oc%n,oc%l) * rnlee(i2,od%n,od%l) * &
-      !        & rwmesh(i1) * rwmesh(i2) * &
-      !        & min(r1,r2) ** L / max(r1,r2) ** (L+1) * a_0
-      !  end do
-      !end do
 
-      integral = Fintegral%get(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L)
+      integral = Fintegral%GetFNL(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L)
 
       r = r + integral * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
           & tjs(oa%j, 2*L, oc%j, -1, 0, 1) * &
@@ -783,6 +941,58 @@ contains
     r = r * dsqrt(dble(oa%j+1) *dble(ob%j+1) * dble(oc%j+1) * dble(od%j+1)) * &
         &   (-1.d0) ** ((oa%j + oc%j) /2 + J)
   end function ee_interaction
+
+  function ee_interaction_darwin(oa, ob, oc, od, J) result(r)
+    use AtLibrary, only: tjs, sjs
+    type(EleSingleParticleOrbit), intent(in) :: oa, ob, oc, od
+    integer, intent(in) :: J
+    real(8) :: r
+    integer :: Lmin, Lmax, L
+    real(8) :: integral
+
+    Lmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
+    Lmax = min(   (oa%j+oc%j),    (ob%j+od%j))/2
+    r = 0.d0
+    do L = Lmin, Lmax
+      if(mod(oa%l + oc%l + L, 2) == 1) cycle
+      if(mod(ob%l + od%l + L, 2) == 1) cycle
+      integral = Fintegral%GetFNLContact(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L)
+
+      r = r + integral * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
+          & tjs(oa%j, 2*L, oc%j, -1, 0, 1) * &
+          & tjs(ob%j, 2*L, od%j, -1, 0, 1)
+    end do
+    r = r * dsqrt(dble(oa%j+1) *dble(ob%j+1) * dble(oc%j+1) * dble(od%j+1)) * &
+        &   (-1.d0) ** ((oa%j + oc%j) /2 + J)
+  end function ee_interaction_darwin
+
+  function ee_interaction_spin_contact(oa, ob, oc, od, J) result(r)
+    use AtLibrary, only: tjs, sjs
+    type(EleSingleParticleOrbit), intent(in) :: oa, ob, oc, od
+    integer, intent(in) :: J
+    real(8) :: r, fk
+    integer :: Lmin, Lmax, L, k
+    real(8) :: integral
+
+    Lmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
+    Lmax = min(   (oa%j+oc%j),    (ob%j+od%j))/2
+    r = 0.d0
+    do L = Lmin, Lmax
+      if(mod(oa%l + oc%l + L, 2) == 1) cycle
+      if(mod(ob%l + od%l + L, 2) == 1) cycle
+      !fk = 0.d0
+      !do k = abs(L-1), L+1
+      !
+      !end do
+      !integral = Fintegral%GetFNLContact(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L)
+
+      !r = r + integral * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
+      !    & tjs(oa%j, 2*L, oc%j, -1, 0, 1) * &
+      !    & tjs(ob%j, 2*L, od%j, -1, 0, 1)
+    end do
+    r = r * dsqrt(dble(oa%j+1) *dble(ob%j+1) * dble(oc%j+1) * dble(od%j+1)) * &
+        &   (-1.d0) ** ((oa%j + oc%j) /2 + J)
+  end function ee_interaction_spin_contact
 
   subroutine WriteAtomicHamil(this, f)
     use AtLibrary, only: find
@@ -850,7 +1060,7 @@ contains
       do ket = 1, bra
         if(sps%orb(bra)%l /= sps%orb(ket)%l) cycle
         if(sps%orb(bra)%j /= sps%orb(ket)%j) cycle
-        write(wunit,'(2i5,6f18.10)') bra,ket, this%kinetic%m(bra,ket), this%potential%m(bra,ket), &
+        write(wunit,'(2i5,6es20.10)') bra,ket, this%kinetic%m(bra,ket), this%potential%m(bra,ket), &
           & this%kinetic_p4%m(bra,ket), this%Darwin_term%m(bra,ket), &
           & this%LS_term%m(bra,ket), this%S%m(bra,ket)
         !write(wunit,'(2i5,3f18.8)') bra,ket, this%kinetic%m(bra,ket)*Eh, this%potential%m(bra,ket)*Eh, this%S%m(bra,ket)
@@ -864,8 +1074,7 @@ contains
 
     write(wunit, '(a)') '##### two-body term #####'
     write(wunit, '(i15, i3)') cnt, 0
-    write(wunit, '(a)') '## a, b, c, d, J, <ab:J|v|cd:J> (a.u.)'
-    !write(wunit, '(a)') '## a, b, c, d, J, <ab:J|v|cd:J> (eV)'
+    write(wunit, '(a)') '## a, b, c, d, J, coulomb, darwin, spin-contact, spin-orbit, orbit-orbit, spin-dipole (a.u.) '
     do ch = 1, ms%NChan
       j = ms%jp(ch)%j
       n = ms%jp(ch)%n_state
@@ -876,8 +1085,10 @@ contains
         do ket = 1, bra
           c = ms%jp(ch)%n2label1(ket)
           d = ms%jp(ch)%n2label2(ket)
-          write(wunit, '(5i5, es16.8)') a, b, c, d, J, this%MatCh(ch,ch)%m(bra, ket)
-          !write(wunit, '(5i5, 1f16.8)') a, b, c, d, J, this%MatCh(ch,ch)%m(bra, ket)*Eh
+          write(wunit, '(5i5, 6es20.10)') a, b, c, d, J, this%ee_coulomb(ch,ch)%m(bra, ket), &
+              & this%ee_darwin(ch,ch)%m(bra,ket), this%ee_spin_contact(ch,ch)%m(bra,ket), &
+              & this%ee_spin_orbit(ch,ch)%m(bra,ket), this%ee_orbit_orbit(ch,ch)%m(bra,ket), &
+              & this%ee_spin_dipole(ch,ch)%m(bra,ket)
         end do
       end do
     end do
@@ -950,7 +1161,7 @@ contains
           d = ms%jp(ch)%n2label2(ket)
           c_k = sps_k%nlj2idx(sps%orb(c)%n, sps%orb(c)%l, sps%orb(c)%j)
           d_k = sps_k%nlj2idx(sps%orb(d)%n, sps%orb(d)%l, sps%orb(d)%j)
-          write(wunit, '(5i5, 1f16.8)') a_k, b_k, c_k, d_k, J, this%MatCh(ch,ch)%m(bra, ket)
+          write(wunit, '(5i5, 1f16.8)') a_k, b_k, c_k, d_k, J, this%ee_coulomb(ch,ch)%m(bra, ket)
         end do
       end do
     end do
