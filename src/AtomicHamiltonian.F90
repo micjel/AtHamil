@@ -773,7 +773,7 @@ contains
           do i = 1, NMesh
             r = r + rnl(i,oa%n,oa%l) * rnl(i,ob%n,ob%l) * rwmesh(i) * zeta**3/ rmesh(i)**3
           end do
-          r = r * ls * 0.25d0 * g_s / alpha**2
+          r = r * ls * 0.125d0 * g_s / alpha**2
         case default
           write(*,*) "Darwin term with the selected basis function is not implemented"
           return
