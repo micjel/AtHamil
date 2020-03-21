@@ -54,7 +54,7 @@ module AtomicHamiltonian
 
   type, private :: FL
     real(8), allocatable :: F(:)
-    real(8), allocatable :: Contact(:)
+    real(8) :: Contact
   end type FL
 
   type, private :: Fnl
@@ -83,7 +83,6 @@ contains
     do bra = 1, this%nidx
       do ket = 1, this%nidx
         deallocate(this%bk(bra,ket)%F)
-        deallocate(this%bk(bra,ket)%Contact)
       end do
     end do
     deallocate(this%bk)
@@ -198,9 +197,8 @@ contains
         lmin = max(abs(l1-l3)-1, abs(l2-l4)-1,0)
         lmax = min(abs(l1+l3), abs(l2+l4)) + 1
         allocate(this%bk(bra,ket)%F(lmin:lmax))
-        allocate(this%bk(bra,ket)%Contact(lmin:lmax))
         this%bk(bra,ket)%F(:) = 0.d0
-        this%bk(bra,ket)%Contact(:) = 0.d0
+        this%bk(bra,ket)%Contact = 0.d0
       end do
     end do
     !
@@ -303,21 +301,11 @@ contains
         l4 = this%l2(ket)
         lmin = max(abs(l1-l3)-1, abs(l2-l4)-1, 0)
         lmax = min(l1+l3, l2+l4) + 1
-        do L = lmin, lmax
-          if(L < 0) cycle
-          if(mod(l1 + l3 + L, 2) == 1) cycle
-          if(mod(l2 + l4 + L, 2) == 1) cycle
-          integral = 0.d0
-          do i1 = 1, NMesh
-            integral = integral + rwmesh(i1) * &
-                & rnl(i1,n1,l1) * rnl(i1,n3,l3) * rnl(i1,n2,l2) * rnl(i1,n4,l4) * (zeta/rmesh(i1))**2
-          end do
-          this%bk(bra,ket)%Contact(L) = integral
-          !!$omp critical
-          !write(*,"(9i3,f12.6)") n1,l1,n2,l2,n3,l3,n4,l4,L,integral
-          !!$omp end critical
-          !write(*,*) bra, ket, L, integral
+        do i1 = 1, NMesh
+          integral = integral + rwmesh(i1) * &
+              & rnl(i1,n1,l1) * rnl(i1,n3,l3) * rnl(i1,n2,l2) * rnl(i1,n4,l4) * (zeta/rmesh(i1))**2
         end do
+        this%bk(bra,ket)%Contact = integral
       end do
     end do
     !$omp end do
@@ -335,14 +323,14 @@ contains
     r = this%bk(bra,ket)%F(L)
   end function GetFNL
 
-  function GetFNLContact(this, n1, l1, n2, l2, n3, l3, n4, l4, L) result(r)
+  function GetFNLContact(this, n1, l1, n2, l2, n3, l3, n4, l4) result(r)
     class(Fnl), intent(in) :: this
-    integer, intent(in) :: n1, l1, n2, l2, n3, l3, n4, l4, L
+    integer, intent(in) :: n1, l1, n2, l2, n3, l3, n4, l4
     integer :: bra, ket
     real(8) :: r
     bra = this%idx(n1,l1,n3,l3)
     ket = this%idx(n2,l2,n4,l4)
-    r = this%bk(bra,ket)%Contact(L)
+    r = this%bk(bra,ket)%Contact
   end function GetFNLContact
 
   subroutine FinAtomicHamil(this)
@@ -789,6 +777,7 @@ contains
 
     call set_ee_coulomb(this)
     call set_ee_darwin(this)
+    call set_ee_spin_contact(this)
   end subroutine set_two_body_part
 
   subroutine set_ee_coulomb(this)
@@ -914,7 +903,7 @@ contains
       end do
       !$omp end do
       !$omp end parallel
-      this%ee_spin_contact(ch,ch)%m(:,:) = this%ee_spin_contact(ch,ch)%m(:,:) * 2.d0 / (3.d0*alpha**2)
+      this%ee_spin_contact(ch,ch)%m(:,:) = this%ee_spin_contact(ch,ch)%m(:,:) * 1.d0 / alpha**2
     end do
   end subroutine set_ee_spin_contact
 
@@ -931,9 +920,7 @@ contains
     do L = Lmin, Lmax
       if(mod(oa%l + oc%l + L, 2) == 1) cycle
       if(mod(ob%l + od%l + L, 2) == 1) cycle
-
       integral = Fintegral%GetFNL(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L)
-
       r = r + integral * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
           & tjs(oa%j, 2*L, oc%j, -1, 0, 1) * &
           & tjs(ob%j, 2*L, od%j, -1, 0, 1)
@@ -953,17 +940,17 @@ contains
     Lmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
     Lmax = min(   (oa%j+oc%j),    (ob%j+od%j))/2
     r = 0.d0
+    integral = Fintegral%GetFNLContact(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l)
     do L = Lmin, Lmax
       if(mod(oa%l + oc%l + L, 2) == 1) cycle
       if(mod(ob%l + od%l + L, 2) == 1) cycle
-      integral = Fintegral%GetFNLContact(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L)
 
-      r = r + integral * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
+      r = r + sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
           & tjs(oa%j, 2*L, oc%j, -1, 0, 1) * &
           & tjs(ob%j, 2*L, od%j, -1, 0, 1)
     end do
     r = r * dsqrt(dble(oa%j+1) *dble(ob%j+1) * dble(oc%j+1) * dble(od%j+1)) * &
-        &   (-1.d0) ** ((oa%j + oc%j) /2 + J)
+        &   (-1.d0) ** ((oa%j + oc%j) /2 + J) * integral
   end function ee_interaction_darwin
 
   function ee_interaction_spin_contact(oa, ob, oc, od, J) result(r)
@@ -971,28 +958,36 @@ contains
     type(EleSingleParticleOrbit), intent(in) :: oa, ob, oc, od
     integer, intent(in) :: J
     real(8) :: r, fk
-    integer :: Lmin, Lmax, L, k
+    integer :: Lmin, Lmax, L, Kmin, Kmax, K
     real(8) :: integral
 
-    Lmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
-    Lmax = min(   (oa%j+oc%j),    (ob%j+od%j))/2
+    Lmin = max(abs(oa%l-oc%l), abs(ob%l-od%l))
+    Lmax = min(   (oa%l+oc%l),    (ob%l+od%l))
+    integral = Fintegral%GetFNLContact(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l)
     r = 0.d0
     do L = Lmin, Lmax
       if(mod(oa%l + oc%l + L, 2) == 1) cycle
       if(mod(ob%l + od%l + L, 2) == 1) cycle
-      !fk = 0.d0
-      !do k = abs(L-1), L+1
-      !
-      !end do
-      !integral = Fintegral%GetFNLContact(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L)
 
-      !r = r + integral * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
-      !    & tjs(oa%j, 2*L, oc%j, -1, 0, 1) * &
-      !    & tjs(ob%j, 2*L, od%j, -1, 0, 1)
+      Kmin = max( abs(oa%j-oc%j)/2, abs(ob%j-od%j)/2, abs(L-1) )
+      Kmax = max(    (oa%j+oc%j)/2,    (ob%j+od%j)/2,    (L+1) )
+      fk = 0.d0
+      do k = abs(L-1), L+1
+        fk = fk + sqrt(dble(2*K+1)) * (-1.d0)**K * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*K) * &
+            & spin_sph( L, K, oa%l, oa%j, oc%l, oc%j ) * spin_sph( L, K, ob%l, ob%j, od%l, od%j )
+      end do
+      r = r + (-1.d0)**L * fk
     end do
-    r = r * dsqrt(dble(oa%j+1) *dble(ob%j+1) * dble(oc%j+1) * dble(od%j+1)) * &
-        &   (-1.d0) ** ((oa%j + oc%j) /2 + J)
+    r = r * integral * (-1.d0)**((ob%j + oc%j) /2 + J)
   end function ee_interaction_spin_contact
+
+  function spin_sph( L, K, la, ja, lc, jc ) result(r)
+    use AtLibrary, only: tjs, snj
+    integer, intent(in) :: L, K, la, ja, lc, jc
+    real(8) :: r
+    r = sqrt( dble( (ja+1) * (2*K+1) * (jc+1) * (2*la+1) * (2*L+1) * (2*lc+1) ) ) * &
+        & snj(2*la, 2*lc, 2*L, 1, 1, 2, ja, jc, 2*K) * tjs( 2*la, 2*L, 2*lc, 0, 0, 0)
+  end function spin_sph
 
   subroutine WriteAtomicHamil(this, f)
     use AtLibrary, only: find
