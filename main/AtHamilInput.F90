@@ -74,7 +74,6 @@ contains
   subroutine CopyInputParameters(params2, params1)
     class(InputParameters), intent(inout) :: params2
     type(InputParameters), intent(in) :: params1
-    integer :: i
 
 
     params2%file_name= params1%file_name
@@ -89,7 +88,7 @@ contains
   subroutine PrintInputParameters(params,unt)
     class(InputParameters), intent(in) :: params
     integer, intent(in), optional :: unt
-    integer :: iunit, i
+    integer :: iunit
     if(present(unt)) then
       iunit = unt
     else
