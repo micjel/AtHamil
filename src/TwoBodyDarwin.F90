@@ -2,6 +2,13 @@ module TwoBodyDarwin
   use OneBodyTerms
   use ElectronTwoBodySpace
   implicit none
+
+  private :: set_ee_darwin_term
+  private :: ee_darwin_interaction
+  private :: finalize_fnl
+  private :: initialize_fnl_laguerre
+  private :: get_fnl
+
   type, private :: FL
     real(8), allocatable :: F
   end type FL
@@ -117,18 +124,18 @@ contains
 
     Lmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
     Lmax = min(   (oa%j+oc%j),    (ob%j+od%j))/2
+    integral = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l)
     r = 0.d0
     do L = Lmin, Lmax
       if(mod(oa%l + oc%l + L, 2) == 1) cycle
       if(mod(ob%l + od%l + L, 2) == 1) cycle
-      integral = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l)
 
-      r = r + integral * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
+      r = r + dble(2*L+1) * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2*L) * &
           & tjs(oa%j, 2*L, oc%j, -1, 0, 1) * &
           & tjs(ob%j, 2*L, od%j, -1, 0, 1)
     end do
-    r = r * dsqrt(dble(oa%j+1) *dble(ob%j+1) * dble(oc%j+1) * dble(od%j+1)) * &
-        &   (-1.d0) ** ((oa%j + oc%j) /2 + J) / alpha**2
+    r = -r * dsqrt(dble(oa%j+1)*dble(ob%j+1)*dble(oc%j+1)*dble(od%j+1)) * &
+        &   (-1.d0) ** ((oa%j+ob%j)/2 + J) / (4.d0*alpha**2)
   end function ee_darwin_interaction
 
   subroutine finalize_fnl(this)

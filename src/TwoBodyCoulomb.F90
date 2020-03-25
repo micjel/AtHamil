@@ -2,6 +2,14 @@ module TwoBodyCoulomb
   use OneBodyTerms
   use ElectronTwoBodySpace
   implicit none
+
+  private :: ee_interaction
+  private :: finalize_fnl
+  private :: initialize_fnl_laguerre
+  private :: initialize_fnl_ho
+  private :: initialize_fnl_hydrogen
+  private :: get_fnl
+
   type, private :: FL
     real(8), allocatable :: F(:)
   end type FL

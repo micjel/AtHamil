@@ -2,6 +2,14 @@ module TwoBodySpinContact
   use OneBodyTerms
   use ElectronTwoBodySpace
   implicit none
+
+  private :: set_ee_spin_contact_term
+  private :: ee_spin_contact_interaction
+  private :: spin_sph
+  private :: finalize_fnl
+  private :: initialize_fnl_laguerre
+  private :: get_fnl
+
   type, private :: FL
     real(8), allocatable :: F
   end type FL

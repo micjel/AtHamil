@@ -143,6 +143,8 @@ contains
     use TwoBodyDarwin
     use TwoBodySpinContact
     use TwoBodyOrbitOrbit
+    use TwoBodySpinOrbit
+    use TwoBodySpinDipole
     class(AtomicHamil), intent(inout) :: this
     integer, intent(in) :: NMesh, NMesh_Mom
     real(8), intent(in) :: rmax, pmax
@@ -167,6 +169,8 @@ contains
       call set_ee_darwin_laguerre( this%ee_darwin, this%ms, NMesh, rmax )
       call set_ee_spin_contact_laguerre( this%ee_spin_contact, this%ms, NMesh, rmax )
       call set_ee_orbit_orbit_laguerre( this%ee_orbit_orbit, this%ms, NMesh, rmax )
+      call set_ee_spin_orbit_laguerre( this%ee_spin_orbit, this%ms, NMesh, rmax )
+      call set_ee_spin_dipole_laguerre( this%ee_spin_dipole, this%ms, NMesh, rmax )
     end select
     write(*,"(a,f12.6,a)") "SetHamil:  ", omp_get_wtime() - ti, " sec"
   end subroutine SetAtomicHamil
