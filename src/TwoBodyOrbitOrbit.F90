@@ -11,11 +11,11 @@ module TwoBodyOrbitOrbit
   private :: R_function
   private :: finalize_fnl
   private :: initialize_fnl_laguerre
-  private :: set_term_cLcL
-  private :: set_term_cLrL
-  private :: set_term_rLrL
-  private :: set_term_r1r1
-  private :: set_term_r1cL
+  private :: set_term_H
+  private :: set_term_I
+  private :: set_term_J
+  private :: set_term_K
+  private :: set_term_M
   private :: get_fnl
   private :: r_power_min_max
   private :: r_power_1_2
@@ -157,7 +157,7 @@ contains
     integer, intent(in) :: J
     real(8) :: r
     integer :: Lmin, Lmax, L
-    real(8) :: I1, I2, I3, I4, I5, I6, I7
+    real(8) :: HL, IL, JL, KL, ML, IL_, JL_
     Lmin = max(abs(oa%j-oc%j), abs(ob%j-od%j))/2
     Lmax = min(   (oa%j+oc%j),    (ob%j+od%j))/2
     r = 0.d0
@@ -166,39 +166,53 @@ contains
       if( triag( ob%l, od%l, L) ) cycle
       if( mod(oa%l+oc%l+L,2) == 1) cycle
       if( mod(ob%l+od%l+L,2) == 1) cycle
-      I1 = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,1)
-      I2 = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,2)
-      I3 = Fintegral%get_fnl(ob%n,ob%l,oa%n,oa%l,od%n,od%l,oc%n,oc%l,L,2)
-      I4 = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,3)
-      I5 = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,4)
-      I6 = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,5)
-      I7 = Fintegral%get_fnl(ob%n,ob%l,oa%n,oa%l,od%n,od%l,oc%n,oc%l,L,5)
+      HL = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,1)
+      IL = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,2)
+      JL = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,3)
+      KL = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,4)
+      ML = Fintegral%get_fnl(oa%n,oa%l,ob%n,ob%l,oc%n,oc%l,od%n,od%l,L,5)
 
-      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * ( &
-          & I1 * C_function(L, oa%l, oa%j, oc%l, oc%j) * C_function(L, ob%l, ob%j, od%l, od%j) + &
-          & I2 * C_function(L, oa%l, oa%j, oc%l, oc%j) * R_function(L, L, ob%l, ob%j, od%l, od%j) + &
-          & I3 * R_function(L, L, oa%l, oa%j, oc%l, oc%j) * C_function(L, ob%l, ob%j, od%l, od%j) + &
-          & I4 * R_function(L, L, oa%l, oa%j, oc%l, oc%j) * R_function(L, L, ob%l, ob%j, od%l, od%j) - &
-          & I5 * R_function(L-1, L, oa%l, oa%j, oc%l, oc%j) * R_function(L-1, L, ob%l, ob%j, od%l, od%j) - &
-          & I6 * R_function(L-1, L, oa%l, oa%j, oc%l, oc%j) * C_function(L, ob%l, ob%j, od%l, od%j) - &
-          & I7 * C_function(L, oa%l, oa%j, oc%l, oc%j) * R_function(L-1, L, ob%l, ob%j, od%l, od%j) )
+      IL_= Fintegral%get_fnl(ob%n,ob%l,oa%n,oa%l,od%n,od%l,oc%n,oc%l,L,2)
+      JL_= Fintegral%get_fnl(ob%n,ob%l,oa%n,oa%l,od%n,od%l,oc%n,oc%l,L,3)
+
+      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * 0.5d0 * HL * &
+          & dble(L*(L+1))/dble(2*L+1) * C_function(L, oa%l, oa%j, oc%l, oc%j) * C_function(L, ob%l, ob%j, od%l, od%j)
+      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * 0.5d0 * IL * &
+          & sqrt(dble(L*(L+1)))/dble(2*L+1) * C_function(L, oa%l, oa%j, oc%l, oc%j) * R_function(L, L, ob%l, ob%j, od%l, od%j)
+      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * 0.5d0 * IL_* &
+          & sqrt(dble(L*(L+1)))/dble(2*L+1) * R_function(L, L, oa%l, oa%j, oc%l, oc%j) * C_function(L, ob%l, ob%j, od%l, od%j)
+      r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * 0.5d0 * JL * &
+          & sqrt(dble(L*(L+1)))/dble(2*L+1) * R_function(L, L, oa%l, oa%j, oc%l, oc%j) * C_function(L, ob%l, ob%j, od%l, od%j)
+      r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * 0.5d0 * JL_* &
+          & sqrt(dble(L*(L+1)))/dble(2*L+1) * C_function(L, oa%l, oa%j, oc%l, oc%j) * R_function(L, L, ob%l, ob%j, od%l, od%j)
+      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * 0.5d0 * KL * &
+          & R_function(L, L, oa%l, oa%j, oc%l, oc%j) * R_function(L, L, ob%l, ob%j, od%l, od%j)
+      r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * ML *  dble(L)/dble(2*L+1)**2 * &
+          & R_function(L+1, L, oa%l, oa%j, oc%l, oc%j) * R_function(L+1, L, ob%l, ob%j, od%l, od%j)
+      if(L==0) cycle
+      r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * ML * dble(L+1)/dble(2*L+1)**2 * &
+          & R_function(L-1, L, oa%l, oa%j, oc%l, oc%j) * R_function(L-1, L, ob%l, ob%j, od%l, od%j)
+      r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * ML * sqrt(dble(L*(L+1)))/dble(2*L+1)**2 * &
+          & R_function(L+1, L, oa%l, oa%j, oc%l, oc%j) * R_function(L-1, L, ob%l, ob%j, od%l, od%j)
+      r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * ML * sqrt(dble(L*(L+1)))/dble(2*L+1)**2 * &
+          & R_function(L-1, L, oa%l, oa%j, oc%l, oc%j) * R_function(L+1, L, ob%l, ob%j, od%l, od%j)
     end do
-    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) * 0.5d0 / alpha**2
+    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) / alpha**2
   end function ee_orbit_orbit_interaction
 
   function C_function(L, la, ja, lc, jc) result(r)
-    ! ( a || C^L || c )
+    ! ( a || Y^L || c )
     use AtLibrary, only: tjs, triag
     integer, intent(in) :: L, la, ja, lc, jc
     real(8) :: r
     r = 0.d0
     if( mod(la+lc+L,2) == 1) return
-    r = (-1.d0)**( (ja-1)/2 ) * sqrt( dble( (ja+1)*(jc+1) )) * &
+    r = (-1.d0)**( (ja-1)/2 ) * sqrt( dble( (ja+1)*(jc+1)*(2*L+1) )) * &
         & tjs( ja, 2*L, jc, -1, 0, 1 )
   end function C_function
 
   function R_function(K, L, la, ja, lc, jc) result(r)
-    ! ( a || [C^K L]^L || c )
+    ! ( a || [Y^K L]^L || c )
     use AtLibrary, only: tjs, sjs, triag
     integer, intent(in) :: K, L, la, ja, lc, jc
     real(8) :: r
@@ -206,7 +220,7 @@ contains
     if( mod(la+lc+K,2) == 1) return
     if( lc==0 ) return
     r = (-1.d0)**( la+lc+(jc+1)/2 ) * &
-        & sqrt( dble( (ja+1)*(jc+1)*(2*la+1)*(2*lc+1)*(2*L+1) )) * &
+        & sqrt( dble( (ja+1)*(jc+1)*(2*la+1)*(2*lc+1)*(2*L+1)*(2*K+1) )) * &
         & sqrt( dble( lc * (lc+1) * (2*lc+1) )) * &
         & sjs( 2*la, ja, 1, jc, 2*lc, 2*L ) * &
         & sjs( 2*K, 2*L, 2, 2*lc, 2*lc, 2*la ) * &
@@ -315,23 +329,22 @@ contains
       end do
     end do
 
-    call set_term_cLcL(this, zeta, lmax)
-    call set_term_cLrL(this, zeta, lmax)
-    call set_term_rLrL(this, zeta, lmax)
-    call set_term_r1r1(this, zeta, lmax)
-    call set_term_r1cL(this, zeta, lmax)
+    call set_term_H(this, zeta, lmax)
+    call set_term_I(this, zeta, lmax)
+    call set_term_J(this, zeta, lmax)
+    call set_term_K(this, zeta, lmax)
+    call set_term_M(this, zeta, lmax)
   end subroutine initialize_fnl_laguerre
 
-  subroutine set_term_cLcL(this, zeta, llmax)
+  subroutine set_term_H(this, zeta, llmax)
     use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, d_laguerre_radial_wf_norm, triag
     type(Fnl), intent(inout) :: this
     integer, intent(in) :: llmax
     real(8), intent(in) :: zeta
     real(8) :: integral, r1, r2
-    real(8), allocatable :: inter(:,:,:,:)
+    real(8), allocatable :: inter(:,:,:)
     real(8), allocatable, save :: r_1(:), w_1(:)
     real(8), allocatable, save :: r_2(:), w_2(:)
-    real(8), allocatable, save :: Rnl1(:), Rnl2(:)
     real(8), allocatable, save :: dRnl1(:), dRnl2(:)
     real(8) :: rmax_
     integer :: NMesh
@@ -340,11 +353,11 @@ contains
     integer :: n1, l1, n2, l2
     integer :: n3, l3, n4, l4
     integer :: bra, ket
-    !$omp threadprivate(r_1, w_1, r_2, w_2, Rnl1, Rnl2, dRnl1, dRnl2)
+    !$omp threadprivate(r_1, w_1, r_2, w_2, dRnl1, dRnl2)
     rmax_ = maxval(rmesh)
     NMesh = size(rmesh)
-    allocate(inter(NMesh,0:2*llmax+1,this%nidx,2))
-    inter(:,:,:,:) = 0.d0
+    allocate(inter(NMesh,0:2*llmax+1,this%nidx))
+    inter(:,:,:) = 0.d0
     !$omp parallel
     !$omp do private(i2, r2, n_1, n_2, ket, n1, l1, n3, l3, i1, L, integral, r1)
     do i2 = 1, NMesh
@@ -353,8 +366,6 @@ contains
       n_2 = NMesh - n_1
       call gauss_legendre(0.d0, rmesh(i2), r_1, w_1, n_1)
       call gauss_legendre(rmesh(i2), rmax_, r_2, w_2, n_2)
-      allocate( Rnl1(n_1) )
-      allocate( Rnl2(n_2) )
       allocate( DRnl1(n_1) )
       allocate( DRnl2(n_2) )
       do ket = 1, this%nidx
@@ -363,11 +374,9 @@ contains
         n3 = this%n2(ket)
         l3 = this%l2(ket)
         do i1 = 1, n_1
-          Rnl1(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
           dRnl1(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) * d_laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
         end do
         do i1 = 1, n_2
-          Rnl2(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
           dRnl2(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) * d_laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
         end do
 
@@ -376,42 +385,23 @@ contains
           if( mod(l1+l3+L,2) == 1) cycle
           if( triag(l1,l3,L)) cycle
           integral = 0.d0
-          do i1 = 1, n_1
+          do i1 = 1, n_1 ! r1 > r2
             r1 = r_1(i1) / zeta
             integral = integral + &
-                & dble(L*(L+1))/dble(2*L-1)*r_power_1_2(r1,r2,L-1,L)*dRnl1(i1) - &
-                & dble(L*(L+1))/dble(2*L+3)*r_power_1_2(r1,r2,L+1,L+2)*dRnl1(i1)
+                & 1.d0/dble(2*L-1)*r_power_2_1(r1,r2,L-1,L)*dRnl1(i1) - &
+                & 1.d0/dble(2*L+3)*r_power_2_1(r1,r2,L+1,L+2)*dRnl1(i1)
           end do
-          do i1 = 1, n_2
+          do i1 = 1, n_2 ! r1 < r2
             r1 = r_2(i1) / zeta
             integral = integral + &
-                & dble(L*(L+1))/dble(2*L-1)*r_power_2_1(r1,r2,L-1,L)*dRnl2(i1) - &
-                & dble(L*(L+1))/dble(2*L+3)*r_power_2_1(r1,r2,L+1,L+2)*dRnl2(i1)
+                & 1.d0/dble(2*L-1)*r_power_1_2(r1,r2,L-1,L)*dRnl2(i1) - &
+                & 1.d0/dble(2*L+3)*r_power_1_2(r1,r2,L+1,L+2)*dRnl2(i1)
           end do
-          inter(i2,L,ket,1) = integral
-
-          integral = 0.d0
-          do i1 = 1, n_1
-            r1 = r_1(i1) / zeta
-            integral = integral + &
-                & 0.5d0*dble(L)*r_power_1_2(r1,r2,L-1,L+1)*dRnl1(i1) - &
-                & 0.5d0*dble(L)*r_power_2_1(r1,r2,L-1,L+1)*dRnl1(i1) - &
-                & 0.5d0*dble(L+1)*r_power_1_2(r1,r2,L,L+2)*dRnl1(i1) + &
-                & 0.5d0*dble(L+1)*r_power_2_1(r1,r2,L-1,L+1)*Rnl1(i1)
-          end do
-          do i1 = 1, n_2
-            r1 = r_2(i1) / zeta
-            integral = integral + &
-                & 0.5d0*dble(L)*r_power_1_2(r1,r2,L-1,L+1)*dRnl2(i1) - &
-                & 0.5d0*dble(L)*r_power_2_1(r1,r2,L-1,L+1)*dRnl2(i1) - &
-                & 0.5d0*dble(L+1)*r_power_1_2(r1,r2,L,L+2)*dRnl2(i1) + &
-                & 0.5d0*dble(L+1)*r_power_2_1(r1,r2,L-1,L+1)*Rnl2(i1)
-          end do
-          inter(i2,L,ket,2) = integral
+          inter(i2,L,ket) = integral
 
         end do
       end do
-      deallocate(r_1, w_1, r_2, w_2, Rnl1, Rnl2, DRnl1, DRnl2)
+      deallocate(r_1, w_1, r_2, w_2, DRnl1, DRnl2)
     end do
     !$omp end do
     !$omp end parallel
@@ -438,13 +428,8 @@ contains
           if( triag(l2,l4,L)) cycle
           integral = 0.d0
           do i2 = 1, NMesh
-            integral = integral + inter(i2,L,ket,1) * rwmesh(i2) * &
+            integral = integral + inter(i2,L,ket) * rwmesh(i2) * &
                 & rnl(i2,n1,l1) * drnl(i2,n3,l3)
-          end do
-
-          do i2 = 1, NMesh
-            integral = integral + inter(i2,L,ket,2) * rwmesh(i2) * &
-                & rnl(i2,n1,l1) * rnl(i2,n3,l3)
           end do
           this%bk(bra,ket)%F(L,1) = integral
         end do
@@ -453,9 +438,9 @@ contains
     !$omp end do
     !$omp end parallel
     deallocate(inter)
-  end subroutine set_term_cLcL
+  end subroutine set_term_H
 
-  subroutine set_term_cLrL(this, zeta, llmax)
+  subroutine set_term_I(this, zeta, llmax)
     use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, d_laguerre_radial_wf_norm, triag
     type(Fnl), intent(inout) :: this
     integer, intent(in) :: llmax
@@ -464,7 +449,6 @@ contains
     real(8), allocatable :: inter(:,:,:)
     real(8), allocatable, save :: r_1(:), w_1(:)
     real(8), allocatable, save :: r_2(:), w_2(:)
-    real(8), allocatable, save :: Rnl1(:), Rnl2(:)
     real(8), allocatable, save :: dRnl1(:), dRnl2(:)
     real(8) :: rmax_
     integer :: NMesh
@@ -473,7 +457,7 @@ contains
     integer :: n1, l1, n2, l2
     integer :: n3, l3, n4, l4
     integer :: bra, ket
-    !$omp threadprivate(r_1, w_1, r_2, w_2, Rnl1, Rnl2, dRnl1, dRnl2)
+    !$omp threadprivate(r_1, w_1, r_2, w_2, dRnl1, dRnl2)
     rmax_ = maxval(rmesh)
     NMesh = size(rmesh)
     allocate(inter(NMesh,0:2*llmax+1,this%nidx))
@@ -486,8 +470,6 @@ contains
       n_2 = NMesh - n_1
       call gauss_legendre(0.d0, rmesh(i2), r_1, w_1, n_1)
       call gauss_legendre(rmesh(i2), rmax_, r_2, w_2, n_2)
-      allocate( Rnl1(n_1) )
-      allocate( Rnl2(n_2) )
       allocate( DRnl1(n_1) )
       allocate( DRnl2(n_2) )
       do ket = 1, this%nidx
@@ -496,11 +478,9 @@ contains
         n3 = this%n2(ket)
         l3 = this%l2(ket)
         do i1 = 1, n_1
-          Rnl1(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
-          dRnl1(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) * d_laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+          dRnl1(i1) = 0.d0
         end do
         do i1 = 1, n_2
-          Rnl2(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
           dRnl2(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) * d_laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
         end do
 
@@ -510,27 +490,23 @@ contains
           if( triag(l1,l3,L)) cycle
 
           integral = 0.d0
-          do i1 = 1, n_1
+          do i1 = 1, n_1 ! r1 < r2
             r1 = r_1(i1) / zeta
-            integral = integral - &
-                & sqrt(dble(L*(L+1))) / dble(2*L+3) * dble(L) * r_power_1_2(r1,r2,L+1,L+2) * Rnl1(i1) + &
-                & sqrt(dble(L*(L+1))) / dble(2*L+3) * dble(L+3) * r_power_2_1(r1,r2,L+1,L+2) * Rnl1(i1) + &
-                & sqrt(dble(L*(L+1))) / dble(2*L-1) * dble(L-2) * r_power_1_2(r1,r2,L-1,L+1) * DRnl1(i1) - &
-                & sqrt(dble(L*(L+1))) / dble(2*L-1) * dble(L+1) * r_power_1_2(r1,r2,L-2,L) * DRnl1(i1)
+            integral = integral + &
+                & dble(L+3) / dble(2*L+3) * r_power_2_1(r1,r2,L,L+2) * DRnl1(i1) - &
+                & dble(L+1) / dble(2*L-1) * r_power_2_1(r1,r2,L-2,L) * DRnl1(i1)
           end do
-          do i1 = 1, n_2
+          do i1 = 1, n_2 ! r1 > r2
             r1 = r_2(i1) / zeta
-            integral = integral - &
-                & sqrt(dble(L*(L+1))) / dble(2*L+3) * dble(L) * r_power_1_2(r1,r2,L+1,L+2) * Rnl2(i1) + &
-                & sqrt(dble(L*(L+1))) / dble(2*L+3) * dble(L+3) * r_power_2_1(r1,r2,L+1,L+2) * Rnl2(i1) + &
-                & sqrt(dble(L*(L+1))) / dble(2*L-1) * dble(L-2) * r_power_1_2(r1,r2,L-1,L+1) * DRnl2(i1) - &
-                & sqrt(dble(L*(L+1))) / dble(2*L-1) * dble(L+1) * r_power_1_2(r1,r2,L-2,L) * DRnl2(i1)
+            integral = integral + &
+                & dble(L+3) / dble(2*L+3) * r_power_2_1(r1,r2,L,L+2) * DRnl2(i1) - &
+                & dble(L+1) / dble(2*L-1) * r_power_2_1(r1,r2,L-2,L) * DRnl2(i1)
           end do
           inter(i2,L,ket) = integral
 
         end do
       end do
-      deallocate(r_1, w_1, r_2, w_2, Rnl1, Rnl2, DRnl1, DRnl2)
+      deallocate(r_1, w_1, r_2, w_2, DRnl1, DRnl2)
     end do
     !$omp end do
     !$omp end parallel
@@ -567,10 +543,10 @@ contains
     !$omp end do
     !$omp end parallel
     deallocate(inter)
-  end subroutine set_term_cLrL
+  end subroutine set_term_I
 
-  subroutine set_term_rLrL(this, zeta, llmax)
-    use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, triag
+  subroutine set_term_J(this, zeta, llmax)
+    use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, d_laguerre_radial_wf_norm, triag
     type(Fnl), intent(inout) :: this
     integer, intent(in) :: llmax
     real(8), intent(in) :: zeta
@@ -578,7 +554,7 @@ contains
     real(8), allocatable :: inter(:,:,:)
     real(8), allocatable, save :: r_1(:), w_1(:)
     real(8), allocatable, save :: r_2(:), w_2(:)
-    real(8), allocatable, save :: Rnl1(:), Rnl2(:)
+    real(8), allocatable, save :: dRnl1(:), dRnl2(:)
     real(8) :: rmax_
     integer :: NMesh
     integer :: n_1, n_2
@@ -586,7 +562,7 @@ contains
     integer :: n1, l1, n2, l2
     integer :: n3, l3, n4, l4
     integer :: bra, ket
-    !$omp threadprivate(r_1, w_1, r_2, w_2, Rnl1, Rnl2)
+    !$omp threadprivate(r_1, w_1, r_2, w_2, dRnl1, dRnl2)
     rmax_ = maxval(rmesh)
     NMesh = size(rmesh)
     allocate(inter(NMesh,0:2*llmax+1,this%nidx))
@@ -599,18 +575,18 @@ contains
       n_2 = NMesh - n_1
       call gauss_legendre(0.d0, rmesh(i2), r_1, w_1, n_1)
       call gauss_legendre(rmesh(i2), rmax_, r_2, w_2, n_2)
-      allocate( Rnl1(n_1) )
-      allocate( Rnl2(n_2) )
+      allocate( DRnl1(n_1) )
+      allocate( DRnl2(n_2) )
       do ket = 1, this%nidx
         n1 = this%n1(ket)
         l1 = this%l1(ket)
         n3 = this%n2(ket)
         l3 = this%l2(ket)
         do i1 = 1, n_1
-          Rnl1(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+          dRnl1(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) * d_laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
         end do
         do i1 = 1, n_2
-          Rnl2(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
+          dRnl2(i1) = 0.d0
         end do
 
         do L = abs(l1-l3)-1, l1+l3+1
@@ -619,23 +595,23 @@ contains
           if( triag(l1,l3,L)) cycle
 
           integral = 0.d0
-          do i1 = 1, n_1
+          do i1 = 1, n_1 ! r1 > r2
             r1 = r_1(i1) / zeta
             integral = integral + &
-                & dble( L*(L+3) ) / dble(2*L+3) * r_power_min_max(r1,r2,L,L+3) * Rnl1(i1) - &
-                & dble( (L-2)*(L+1) ) / dble(2*L-1) * r_power_min_max(r1,r2,L-2,L+1) * Rnl1(i1)
+                & dble( L ) / dble(2*L+3) * r_power_min_max(r1,r2,L+1,L+3) * DRnl1(i1) - &
+                & dble( L-2 ) / dble(2*L-1) * r_power_min_max(r1,r2,L-1,L+1) * DRnl1(i1)
           end do
-          do i1 = 1, n_2
+          do i1 = 1, n_2 ! r1 < r2
             r1 = r_2(i1) / zeta
             integral = integral + &
-                & dble( L*(L+3) ) / dble(2*L+3) * r_power_min_max(r1,r2,L,L+3) * Rnl2(i1) - &
-                & dble( (L-2)*(L+1) ) / dble(2*L-1) * r_power_min_max(r1,r2,L-2,L+1) * Rnl2(i1)
+                & dble( L ) / dble(2*L+3) * r_power_min_max(r1,r2,L+1,L+3) * DRnl2(i1) - &
+                & dble( L-2 ) / dble(2*L-1) * r_power_min_max(r1,r2,L-1,L+1) * DRnl2(i1)
           end do
           inter(i2,L,ket) = integral
 
         end do
       end do
-      deallocate(r_1, w_1, r_2, w_2, Rnl1, Rnl2)
+      deallocate(r_1, w_1, r_2, w_2, dRnl1, dRnl2)
     end do
     !$omp end do
     !$omp end parallel
@@ -672,9 +648,9 @@ contains
     !$omp end do
     !$omp end parallel
     deallocate(inter)
-  end subroutine set_term_rLrL
+  end subroutine set_term_J
 
-  subroutine set_term_r1r1(this, zeta, llmax)
+  subroutine set_term_K(this, zeta, llmax)
     use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, triag
     type(Fnl), intent(inout) :: this
     integer, intent(in) :: llmax
@@ -724,15 +700,17 @@ contains
           if( triag(l1,l3,L)) cycle
 
           integral = 0.d0
-          do i1 = 1, n_1
+          do i1 = 1, n_1 ! r1 > r2
             r1 = r_1(i1) / zeta
             integral = integral + &
-                & dble( 2*(2*L-1) ) / dble(L+1) * r_power_min_max(r1,r2,L-1,L+2) * Rnl1(i1)
+                & dble( L*(L+3) ) / dble(2*L+3) * r_power_2_1(r1,r2,L,L+3) * Rnl1(i1) - &
+                & dble( (L-2)*(L+1))/dble(2*L-1) * r_power_2_1(r1,r2,L-2,L+1)*Rnl1(i1)
           end do
-          do i1 = 1, n_2
+          do i1 = 1, n_2 ! r1 < r2
             r1 = r_2(i1) / zeta
             integral = integral + &
-                & dble( 2*(2*L-1) ) / dble(L+1) * r_power_min_max(r1,r2,L-1,L+2) * Rnl2(i1)
+                & dble( L*(L+3) ) / dble(2*L+3) * r_power_1_2(r1,r2,L,L+3) * Rnl2(i1) - &
+                & dble( (L-2)*(L+1))/dble(2*L-1) * r_power_1_2(r1,r2,L-2,L+1)*Rnl2(i1)
           end do
           inter(i2,L,ket) = integral
 
@@ -775,9 +753,9 @@ contains
     !$omp end do
     !$omp end parallel
     deallocate(inter)
-  end subroutine set_term_r1r1
+  end subroutine set_term_K
 
-  subroutine set_term_r1cL(this, zeta, llmax)
+  subroutine set_term_M(this, zeta, llmax)
     use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, triag
     type(Fnl), intent(inout) :: this
     integer, intent(in) :: llmax
@@ -827,17 +805,13 @@ contains
           if( triag(l1,l3,L)) cycle
 
           integral = 0.d0
-          do i1 = 1, n_1
+          do i1 = 1, n_1 ! r1 > r2
             r1 = r_1(i1) / zeta
-            integral = integral + &
-                & sqrt( 0.5d0*dble(L*(2*L-1)) ) * r_power_1_2(r1,r2,L-2,L+1) * Rnl1(i1) - &
-                & sqrt( 0.5d0*dble(L*(2*L-1)) ) * r_power_2_1(r1,r2,L,L+3) * Rnl1(i1)
+            integral = integral + r_power_2_1(r1,r2,L-1,L+2) * Rnl1(i1)
           end do
-          do i1 = 1, n_2
+          do i1 = 1, n_2 ! r1 < r2
             r1 = r_2(i1) / zeta
-            integral = integral + &
-                & sqrt( 0.5d0*dble(L*(2*L-1)) ) * r_power_1_2(r1,r2,L-2,L+1) * Rnl2(i1) - &
-                & sqrt( 0.5d0*dble(L*(2*L-1)) ) * r_power_2_1(r1,r2,L,L+3) * Rnl2(i1)
+            integral = integral + r_power_1_2(r1,r2,L-1,L+2) * Rnl2(i1)
           end do
           inter(i2,L,ket) = integral
         end do
@@ -879,7 +853,7 @@ contains
     !$omp end do
     !$omp end parallel
     deallocate(inter)
-  end subroutine set_term_r1cL
+  end subroutine set_term_M
 
   function get_fnl(this, n1, l1, n2, l2, n3, l3, n4, l4, L, i) result(r)
     class(Fnl), intent(in) :: this

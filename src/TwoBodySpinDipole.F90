@@ -154,14 +154,14 @@ contains
       !if( mod(oa%l+oc%l+L-1,2) == 1) cycle
       !if( mod(ob%l+od%l+L+1,2) == 1) cycle
       I1 = Fintegral%get_fnl( oa%n, oa%l, ob%n, ob%l, oc%n, oc%l, od%n, od%l, L )
-      r = r + sjs( 2, 2, 4, 2*L+2, 2*L-2, 2*L ) * sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * sqrt(dble(L*(L+1))) * &
           & I1 * CS_function(L-1,L,oa%l,oa%j,oc%l,oc%j) * CS_function(L+1,L,ob%l,ob%j,od%l,od%j)
     end do
-    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) * sqrt(dble(5)) / alpha**2
+    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) / alpha**2
   end function ee_spin_dipole_interaction_
 
   function CS_function(K, L, la, ja, lc, jc) result(r)
-    ! ( a || [ C^K S ]^L || c )
+    ! ( a || [ Y^K S ]^L || c )
     use AtLibrary, only: tjs, snj
     integer, intent(in) :: K, L, la, ja, lc, jc
     real(8) :: r
@@ -315,7 +315,7 @@ contains
         n3 = this%n2(ket)
         l3 = this%l2(ket)
         do i1 = 1, n_1
-          Rnl1(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+          Rnl1(i1) =  0.d0
         end do
         do i1 = 1, n_2
           Rnl2(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
@@ -328,13 +328,11 @@ contains
           integral = 0.d0
           do i1 = 1, n_1
             r1 = r_1(i1) / zeta
-            integral = integral + &
-                & sqrt( dble(L*(L+1)*(2*L-1)*(2*L+1)*(2*L+3)) ) *r_power_1_2(r1,r2,L-1,L+2)*Rnl1(i1)
+            integral = integral + r_power_2_1(r1,r2,L-1,L+2)*Rnl1(i1)
           end do
           do i1 = 1, n_2
             r1 = r_2(i1) / zeta
-            integral = integral + &
-                & sqrt( dble(L*(L+1)*(2*L-1)*(2*L+1)*(2*L+3)) ) *r_power_1_2(r1,r2,L-1,L+2)*Rnl2(i1)
+            integral = integral + r_power_2_1(r1,r2,L-1,L+2)*Rnl2(i1)
           end do
           inter(i2,L,ket) = integral
 
