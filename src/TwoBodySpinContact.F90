@@ -11,7 +11,7 @@ module TwoBodySpinContact
   private :: get_fnl
 
   type, private :: FL
-    real(8), allocatable :: F
+    real(8) :: F
   end type FL
 
   type, private :: Fnl

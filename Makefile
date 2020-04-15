@@ -15,7 +15,7 @@ Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q cedar; then echo cedar; \
   else echo other; fi)
 HOST=$(strip $(Host))
-DEBUG_MODE=on
+DEBUG_MODE=off
 Gauss_Laguerre=off
 
 OS = Linux
@@ -80,14 +80,12 @@ ifeq ($(strip $(HOST)),oak)
     FFLAGS+= -Dgauss_laguerre
   endif
   ifeq ($(DEBUG_MODE),on)
-    DFLAGS+=-Wall -pedantic -fbounds-check -O -Wuninitialized -fbacktrace
-    #FDFLAGS+=-ffpe-trap=invalid,zero,overflow # Note: gsl larguerre signal
+    DFLAGS+=-check all
     ifneq ($(OS), OSX)
       DFLAGS+= -pg -g
     endif
   endif
 endif
-
 
 ifeq ($(DEBUG_MODE),on)
 endif

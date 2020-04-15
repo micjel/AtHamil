@@ -46,7 +46,9 @@ contains
 
   subroutine set_ee_orbit_orbit_laguerre( this, ms, NMesh, rmax )
     use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, &
-        & fixed_point_quadrature, ln_gamma, laguerre, d_laguerre_radial_wf_norm
+      & fixed_point_quadrature, ln_gamma, laguerre, d_laguerre_radial_wf_norm, &
+      & d_laguerre_radial_wf
+
     type(AtomicHamilChan), intent(inout) :: this(:,:)
     type(EleTwoBodySpace), intent(in) :: ms
     integer, intent(in) :: NMesh
@@ -72,7 +74,7 @@ contains
 #ifdef gauss_laguerre
           rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
               & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
-          drnl(i,n,l) = r * d_laguerre_radial_wf( n, l, ms%zeta, rmesh(i) )
+          drnl(i,n,l) = rmesh(i) * d_laguerre_radial_wf( n, l, ms%zeta, rmesh(i) )
 #else
           rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
           drnl(i,n,l) = d_laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
