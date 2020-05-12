@@ -3,22 +3,23 @@ module AtomicHamiltonian
   use LinAlgLib
   use ElectronTwoBodySpace
   use EleSingleParticleState
-  use OneBodyTerms, only: AtomicHamilChan
+  use OneBodyTerms
+  use TwoBodyTerms
   implicit none
 
   type :: AtomicHamil
-    type(AtomicHamilChan), allocatable :: ee_coulomb(:,:)
-    type(AtomicHamilChan), allocatable :: ee_darwin(:,:)
-    type(AtomicHamilChan), allocatable :: ee_spin_contact(:,:)
-    type(AtomicHamilChan), allocatable :: ee_spin_orbit(:,:)
-    type(AtomicHamilChan), allocatable :: ee_orbit_orbit(:,:)
-    type(AtomicHamilChan), allocatable :: ee_spin_dipole(:,:)
-    type(AtomicHamilChan) :: kinetic
-    type(AtomicHamilChan) :: potential
-    type(AtomicHamilChan) :: kinetic_p4  ! relativistic correction for kinetic term
-    type(AtomicHamilChan) :: Darwin_term ! nucleus-electron contact interaction
-    type(AtomicHamilChan) :: LS_term     ! nucleus-electron spin-orbit interaction
-    type(AtomicHamilChan) :: S
+    type(TwoBodyOperator) :: ee_coulomb
+    type(TwoBodyOperator) :: ee_darwin
+    type(TwoBodyOperator) :: ee_spin_contact
+    type(TwoBodyOperator) :: ee_spin_orbit
+    type(TwoBodyOperator) :: ee_orbit_orbit
+    type(TwoBodyOperator) :: ee_spin_dipole
+    type(OneBodyOperator) :: kinetic
+    type(OneBodyOperator) :: potential
+    type(OneBodyOperator) :: kinetic_p4  ! relativistic correction for kinetic term
+    type(OneBodyOperator) :: Darwin_term ! nucleus-electron contact interaction
+    type(OneBodyOperator) :: LS_term     ! nucleus-electron spin-orbit interaction
+    type(OneBodyOperator) :: S
     type(EleTwoBodySpace), pointer :: ms
     logical :: is_init = .false.
     integer :: jr = 0
@@ -42,23 +43,12 @@ module AtomicHamiltonian
 contains
   subroutine FinAtomicHamil(this)
     class(AtomicHamil), intent(inout) :: this
-    integer :: chbra, chket
-    do chbra = 1, this%ms%NChan
-      do chket = 1, this%ms%NChan
-        call this%ee_coulomb(chbra,chket)%fin()
-        call this%ee_darwin(chbra,chket)%fin()
-        call this%ee_spin_contact(chbra,chket)%fin()
-        call this%ee_spin_orbit(chbra,chket)%fin()
-        call this%ee_orbit_orbit(chbra,chket)%fin()
-        call this%ee_spin_dipole(chbra,chket)%fin()
-      end do
-    end do
-    deallocate(this%ee_coulomb)
-    deallocate(this%ee_darwin)
-    deallocate(this%ee_spin_contact)
-    deallocate(this%ee_spin_orbit)
-    deallocate(this%ee_orbit_orbit)
-    deallocate(this%ee_spin_dipole)
+    call this%ee_coulomb%fin()
+    call this%ee_darwin%fin()
+    call this%ee_spin_contact%fin()
+    call this%ee_spin_orbit%fin()
+    call this%ee_orbit_orbit%fin()
+    call this%ee_spin_dipole%fin()
     call this%kinetic%fin()
     call this%potential%fin()
     call this%kinetic_p4%fin()
@@ -68,53 +58,33 @@ contains
     this%is_init = .false.
   end subroutine FinAtomicHamil
 
-  subroutine InitAtomicHamil(this, two)
+  subroutine InitAtomicHamil(this, two, opname)
     use AtLibrary, only: m_e, hc, alpha
     class(AtomicHamil), intent(inout) :: this
     type(EleTwoBodySpace), target, intent(in) :: two
+    character(*), intent(in) :: opname
     integer :: chbra, chket
     integer :: nb, jb, pb
     integer :: nk, jk, pk
-    if(allocated(this%ee_coulomb)) call this%fin()
+
     this%ms => two
-    allocate(this%ee_coulomb(two%NChan, two%NChan))
-    allocate(this%ee_darwin(two%NChan, two%NChan))
-    allocate(this%ee_spin_contact(two%NChan, two%NChan))
-    allocate(this%ee_spin_orbit(two%NChan, two%NChan))
-    allocate(this%ee_orbit_orbit(two%NChan, two%NChan))
-    allocate(this%ee_spin_dipole(two%NChan, two%NChan))
-    do chbra = 1, two%NChan
-      nb = this%ms%jp(chbra)%n_state
-      jb = this%ms%jp(chbra)%j
-      pb = this%ms%jp(chbra)%p
-      do chket = 1, two%NChan
-        nk = this%ms%jp(chket)%n_state
-        jk = this%ms%jp(chket)%j
-        pk = this%ms%jp(chket)%p
-        if(jb /= jk) cycle
-        if(pb /= pk) cycle
-        this%ee_coulomb(chbra,chket)%Zero = .false.
-        this%ee_darwin(chbra,chket)%Zero = .false.
-        this%ee_spin_contact(chbra,chket)%Zero = .false.
-        this%ee_spin_orbit(chbra,chket)%Zero = .false.
-        this%ee_orbit_orbit(chbra,chket)%Zero = .false.
-        this%ee_spin_dipole(chbra,chket)%Zero = .false.
-        call this%ee_coulomb(chbra, chket)%zeros(nb,nk)
-        call this%ee_darwin(chbra, chket)%zeros(nb,nk)
-        call this%ee_spin_contact(chbra, chket)%zeros(nb,nk)
-        call this%ee_spin_orbit(chbra, chket)%zeros(nb,nk)
-        call this%ee_orbit_orbit(chbra, chket)%zeros(nb,nk)
-        call this%ee_spin_dipole(chbra, chket)%zeros(nb,nk)
-      end do
-    end do
+    this%OpName = opname
+    call this%kinetic%init(    two%sps )
+    call this%potential%init(  two%sps )
+    call this%kinetic_p4%init( two%sps )
+    call this%Darwin_term%init(two%sps )
+    call this%LS_term%init(    two%sps )
+    call this%S%eye(two%sps%norbs)
+
+    call this%ee_coulomb%init(two)
+    call this%ee_darwin%init(two)
+    call this%ee_spin_contact%init(two)
+    call this%ee_spin_orbit%init(two)
+    call this%ee_orbit_orbit%init(two)
+    call this%ee_spin_dipole%init(two)
+
     this%kinetic%Zero = .false.
     this%potential%Zero = .false.
-    call this%kinetic%zeros(two%sps%norbs, two%sps%norbs)
-    call this%potential%zeros(two%sps%norbs, two%sps%norbs)
-    call this%kinetic_p4%zeros(two%sps%norbs, two%sps%norbs)
-    call this%Darwin_term%zeros(two%sps%norbs, two%sps%norbs)
-    call this%LS_term%zeros(two%sps%norbs, two%sps%norbs)
-    call this%S%eye(two%sps%norbs)
     this%is_init = .true.
     a_0 = hc / (m_e * 1.d3) * alpha ! bohr radius unit of nm nuclear mass infinity limit
     select case(two%sps%basis)
@@ -153,24 +123,28 @@ contains
     ti = omp_get_wtime()
     select case(this%ms%sps%basis)
     case("HO", "ho")
-      call set_kinetic_ho( this%kinetic, this%ms%sps, this%ms%zeta )
-      call set_coulomb_ho( this%potential, this%ms%sps, this%ms%zeta, NMesh, rmax )
+      call this%kinetic%set( "kinetic_ho", this%ms%zeta )
+      call this%potential%set( "coulomb_ho", this%ms%zeta, NMesh, rmax )
     case("AO", "ao")
-      call set_kinetic_hydrogen( this%kinetic, this%ms%sps, this%ms%zeta, NMesh_mom, pmax )
-      call set_coulomb_hydrogen( this%potential, this%ms%sps, this%ms%zeta, NMesh, rmax )
+      call this%kinetic%set( "kinetic_hydrogen", this%ms%zeta, NMesh_mom, pmax )
+      call this%potential%set("coulomb_hydrogen", this%ms%zeta, NMesh, rmax )
     case("LO", "lo", "LO-2nl", "lo-2nl")
-      call set_kinetic_laguerre( this%kinetic, this%ms%sps, this%ms%zeta )
-      call set_coulomb_laguerre( this%potential, this%ms%sps, this%ms%zeta, NMesh, rmax )
-      call set_kinetic_correction_laguerre( this%kinetic_p4, this%ms%sps, this%ms%zeta, NMesh_mom, pmax )
-      call set_Darwin_laguerre( this%Darwin_term, this%ms%sps, this%ms%zeta )
-      call set_spin_orbit_laguerre( this%LS_term, this%ms%sps, this%ms%zeta, NMesh, rmax )
+      call this%kinetic%set("kinetic_laguerre", this%ms%zeta )
+      call this%potential%set("coulomb_laguerre", this%ms%zeta, NMesh, rmax )
+      if( this%OpName == "Breit") then
+        call this%kinetic_p4%set("kinetic_correction_laguerre", this%ms%zeta, NMesh_mom, pmax )
+        call this%Darwin_term%set("Darwin_laguerre", this%ms%zeta )
+        call this%LS_term%set("spin_orbit_laguerre", this%ms%zeta, NMesh, rmax )
+      end if
 
       call set_ee_coulomb_laguerre( this%ee_coulomb, this%ms, NMesh, rmax )
-      call set_ee_darwin_laguerre( this%ee_darwin, this%ms, NMesh, rmax )
-      call set_ee_spin_contact_laguerre( this%ee_spin_contact, this%ms, NMesh, rmax )
-      call set_ee_orbit_orbit_laguerre( this%ee_orbit_orbit, this%ms, NMesh, rmax )
-      call set_ee_spin_orbit_laguerre( this%ee_spin_orbit, this%ms, NMesh, rmax )
-      call set_ee_spin_dipole_laguerre( this%ee_spin_dipole, this%ms, NMesh, rmax )
+      if( this%OpName == "Breit") then
+        call set_ee_darwin_laguerre( this%ee_darwin, this%ms, NMesh, rmax )
+        call set_ee_spin_contact_laguerre( this%ee_spin_contact, this%ms, NMesh, rmax )
+        call set_ee_orbit_orbit_laguerre( this%ee_orbit_orbit, this%ms, NMesh, rmax )
+        call set_ee_spin_orbit_laguerre( this%ee_spin_orbit, this%ms, NMesh, rmax )
+        call set_ee_spin_dipole_laguerre( this%ee_spin_dipole, this%ms, NMesh, rmax )
+      end if
     end select
     write(*,"(a,f12.6,a)") "SetHamil:  ", omp_get_wtime() - ti, " sec"
   end subroutine SetAtomicHamil
@@ -265,10 +239,13 @@ contains
         do ket = 1, bra
           c = ms%jp(ch)%n2label1(ket)
           d = ms%jp(ch)%n2label2(ket)
-          write(wunit, '(5i5, 6es20.10)') a, b, c, d, J, this%ee_coulomb(ch,ch)%m(bra, ket), &
-              & this%ee_darwin(ch,ch)%m(bra,ket), this%ee_spin_contact(ch,ch)%m(bra,ket), &
-              & this%ee_spin_orbit(ch,ch)%m(bra,ket), this%ee_orbit_orbit(ch,ch)%m(bra,ket), &
-              & this%ee_spin_dipole(ch,ch)%m(bra,ket)
+          write(wunit, '(5i5, 6es20.10)') a, b, c, d, J, &
+              & this%ee_coulomb%GetTBME(a,b,c,d,J), &
+              & this%ee_darwin%GetTBME(a,b,c,d,J), &
+              & this%ee_spin_contact%GetTBME(a,b,c,d,J), &
+              & this%ee_spin_orbit%GetTBME(a,b,c,d,J), &
+              & this%ee_orbit_orbit%GetTBME(a,b,c,d,J), &
+              & this%ee_spin_dipole%GetTBME(a,b,c,d,J)
         end do
       end do
     end do
@@ -341,7 +318,7 @@ contains
           d = ms%jp(ch)%n2label2(ket)
           c_k = sps_k%nlj2idx(sps%orb(c)%n, sps%orb(c)%l, sps%orb(c)%j)
           d_k = sps_k%nlj2idx(sps%orb(d)%n, sps%orb(d)%l, sps%orb(d)%j)
-          write(wunit, '(5i5, 1f16.8)') a_k, b_k, c_k, d_k, J, this%ee_coulomb(ch,ch)%m(bra, ket)
+          write(wunit, '(5i5, 1f16.8)') a_k, b_k, c_k, d_k, J, this%ee_coulomb%GetTBME(a,b,c,d,J)
         end do
       end do
     end do

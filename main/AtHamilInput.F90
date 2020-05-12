@@ -16,6 +16,7 @@ module AtHamilInput
     integer :: NMesh_Mom
     real(8) :: pmax
     character(:), allocatable :: file_name
+    character(:), allocatable :: opname
     integer :: emax, e2max, lmax
     logical :: test_mode
     logical :: count_memory
@@ -35,6 +36,7 @@ contains
     real(8) :: pmax=1.d3
     character(256) :: basis = "LO"
     character(512) :: file_name = "default"
+    character(256) :: opname = "Breit"
     integer :: emax = 6
     integer :: e2max=12
     integer :: lmax = -1
@@ -45,7 +47,7 @@ contains
     ! input file name
     character(512) :: inputfile
     namelist /input/ zeta, basis, file_name, emax, e2max, lmax, test_mode, count_memory, &
-        & rmax, NMesh, pmax, NMesh_Mom
+        & rmax, NMesh, pmax, NMesh_Mom, opname
     call getarg(1, inputfile)
     inquire(file = inputfile, exist = ex)
     if(.not.ex) then
@@ -66,6 +68,7 @@ contains
     params%Nmesh = NMesh
     params%pmax = pmax
     params%Nmesh_Mom = NMesh_Mom
+    params%opname = opname
     if(params%lmax==-1) params%lmax = params%emax
 
     params%count_memory = count_memory
@@ -83,6 +86,7 @@ contains
     params2%test_mode= params1%test_mode
     params2%zeta     = params1%zeta
     params2%basis    = params1%basis
+    params2%opname   = params1%opname
   end subroutine CopyInputParameters
 
   subroutine PrintInputParameters(params,unt)
@@ -100,6 +104,7 @@ contains
     write(*,"(2a)") "# NuHamil version is ", trim(VERSION)
 #endif
     write(iunit,"(a)") "# Calculation for the matrix elements of Atomic Hamiltonian"
+    write(iunit,"(2a)") "# Operator", trim(params%opname)
     write(iunit,'(a, i3, a, i3, a, i3)') '# emax: ', params%emax, ', e2max: ', params%e2max, &
         & ", lmax: ", params%lmax
     write(iunit,'(3a,f6.2)') '# basis: ', trim(params%basis), ", basis parameter: ", params%zeta

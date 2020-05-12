@@ -1,5 +1,6 @@
 module TwoBodyDarwin
   use OneBodyTerms
+  use TwoBodyTerms
   use ElectronTwoBodySpace
   implicit none
 
@@ -34,7 +35,7 @@ contains
   subroutine set_ee_darwin_laguerre( this, ms, NMesh, rmax )
     use AtLibrary, only: gauss_legendre, laguerre_radial_wf_norm, &
         & fixed_point_quadrature, ln_gamma, laguerre
-    type(AtomicHamilChan), intent(inout) :: this(:,:)
+    type(TwoBodyOperator), intent(inout) :: this
     type(EleTwoBodySpace), intent(in) :: ms
     integer, intent(in) :: NMesh
     integer :: n, l, i
@@ -74,7 +75,7 @@ contains
   end subroutine set_ee_darwin_laguerre
 
   subroutine set_ee_darwin_term( this, ms )
-    type(AtomicHamilChan), intent(inout) :: this(:,:)
+    type(TwoBodyOperator), intent(inout) :: this
     type(EleTwoBodySpace), intent(in), target :: ms
     type(EleOrbits), pointer :: sps
     type(EleSingleParticleOrbit), pointer :: oa, ob, oc, od
@@ -105,8 +106,8 @@ contains
           rbacd = ee_darwin_interaction(ob, oa, oc, od, J) * (-1.d0)**((oa%j+ob%j)/2-J-1)
           rabdc = ee_darwin_interaction(oa, ob, od, oc, J) * (-1.d0)**((oc%j+od%j)/2-J-1)
           rbadc = ee_darwin_interaction(ob, oa, od, oc, J) * (-1.d0)**((oa%j+ob%j+oc%j+od%j)/2)
-          this(ch,ch)%m(bra,ket) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
-          this(ch,ch)%m(ket,bra) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+          this%MatCh(ch,ch)%m(bra,ket) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+          this%MatCh(ch,ch)%m(ket,bra) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
         end do
       end do
       !$omp end do

@@ -442,9 +442,9 @@ contains
     real(8) :: x, s
     s = 0.d0
     x = 2.d0 * r / b
-    s = (0.5d0 * b * dble(l) / x - 0.25d0 * b) * Laguerre_radial_wf(n,l,b,r)
+    s = 2.d0 / b * (dble(l) / x - 0.5d0) * Laguerre_radial_wf(n,l,b,r)
     if(n==0) return
-    s = s - 0.5d0 * b * sqrt(dble(n)) / sqrt(x) * Laguerre_radial_wf_(n-1,dble(l)+0.5d0,b,r)
+    s = s - 2.d0/b * sqrt(dble(n)) / sqrt(x) * Laguerre_radial_wf_(n-1,dble(l)+0.5d0,b,r)
   end function d_Laguerre_radial_wf
 
   function Mom_Laguerre_radial_wf_norm(n,l,b,p) result(s)

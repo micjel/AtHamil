@@ -1,14 +1,16 @@
 obj/AtLibrary.o : src/AtLibrary.f90 
-obj/AtomicHamiltonian.o : src/AtomicHamiltonian.F90 obj/TwoBodySpinDipole.o obj/TwoBodySpinOrbit.o obj/TwoBodyOrbitOrbit.o obj/TwoBodySpinContact.o obj/TwoBodyDarwin.o obj/TwoBodyCoulomb.o obj/AtLibrary.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
+obj/AtomicHamiltonian.o : src/AtomicHamiltonian.F90 obj/TwoBodySpinDipole.o obj/TwoBodySpinOrbit.o obj/TwoBodyOrbitOrbit.o obj/TwoBodySpinContact.o obj/TwoBodyDarwin.o obj/TwoBodyCoulomb.o obj/AtLibrary.o obj/TwoBodyTerms.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
+obj/AtomicOperator.o : src/AtomicOperator.F90 obj/TwoBodyTerms.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
 obj/EleSingleParticleState.o : src/EleSingleParticleState.F90 obj/AtLibrary.o 
 obj/ElectronTwoBodySpace.o : src/ElectronTwoBodySpace.F90 obj/AtLibrary.o obj/EleSingleParticleState.o 
 obj/OneBodyTerms.o : src/OneBodyTerms.F90 obj/AtLibrary.o obj/EleSingleParticleState.o obj/LinAlgLib.o 
-obj/TwoBodyCoulomb.o : src/TwoBodyCoulomb.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/OneBodyTerms.o 
-obj/TwoBodyDarwin.o : src/TwoBodyDarwin.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/OneBodyTerms.o 
-obj/TwoBodyOrbitOrbit.o : src/TwoBodyOrbitOrbit.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/OneBodyTerms.o 
-obj/TwoBodySpinContact.o : src/TwoBodySpinContact.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/OneBodyTerms.o 
-obj/TwoBodySpinDipole.o : src/TwoBodySpinDipole.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/OneBodyTerms.o 
-obj/TwoBodySpinOrbit.o : src/TwoBodySpinOrbit.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/OneBodyTerms.o 
+obj/TwoBodyCoulomb.o : src/TwoBodyCoulomb.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/TwoBodyTerms.o obj/OneBodyTerms.o 
+obj/TwoBodyDarwin.o : src/TwoBodyDarwin.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/TwoBodyTerms.o obj/OneBodyTerms.o 
+obj/TwoBodyOrbitOrbit.o : src/TwoBodyOrbitOrbit.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/TwoBodyTerms.o obj/OneBodyTerms.o 
+obj/TwoBodySpinContact.o : src/TwoBodySpinContact.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/TwoBodyTerms.o obj/OneBodyTerms.o 
+obj/TwoBodySpinDipole.o : src/TwoBodySpinDipole.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/TwoBodyTerms.o obj/OneBodyTerms.o 
+obj/TwoBodySpinOrbit.o : src/TwoBodySpinOrbit.F90 obj/AtLibrary.o obj/ElectronTwoBodySpace.o obj/TwoBodyTerms.o obj/OneBodyTerms.o 
+obj/TwoBodyTerms.o : src/TwoBodyTerms.F90 obj/AtLibrary.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
 obj/ClassSys.o : main/ClassSys.f90 
 obj/AtHamilInput.o : main/AtHamilInput.F90 
 obj/AtHamilMain.o : main/AtHamilMain.F90 obj/AtHamilInput.o obj/AtomicHamiltonian.o obj/EleSingleParticleState.o obj/AtLibrary.o 

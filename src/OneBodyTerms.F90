@@ -4,18 +4,90 @@ module OneBodyTerms
   use EleSingleParticleState
 
   implicit none
-  type, extends(DMat) :: AtomicHamilChan
+  type, extends(DMat) :: OneBodyOperator
+    type(EleOrbits), pointer :: sps
+    integer :: jrank = 0, prank = 1
     logical :: Zero = .true.
   contains
-  end type AtomicHamilChan
+    procedure :: InitOneBodyOperator
+    procedure :: FinOneBodyOperator
+    procedure :: SetOneBodyOperator
+    generic :: init => InitOneBodyOperator
+    generic :: release => FinOneBodyOperator
+    generic :: set => SetOneBodyOperator
+  end type OneBodyOperator
 
   real(8), private, allocatable :: rmesh(:), rwmesh(:)
   real(8), private, allocatable :: pmesh(:), pwmesh(:)
   real(8), private, allocatable :: rnl(:,:,:)
   real(8), private, allocatable :: rnl_mom(:,:,:)
 contains
+
+  subroutine InitOneBodyOperator( this, sps, jrank, prank )
+    class(OneBodyOperator), intent(inout) :: this
+    type(EleOrbits), intent(in), target :: sps
+    integer, intent(in), optional :: jrank, prank
+    this%sps => sps
+    if(present( jrank )) this%jrank = jrank
+    if(present( prank )) this%prank = prank
+    call this%zeros( sps%norbs, sps%norbs )
+  end subroutine InitOneBodyOperator
+
+  subroutine FinOneBodyOperator( this )
+    class(OneBodyOperator), intent(inout) :: this
+    call this%fin()
+    this%sps => null()
+    this%jrank = 0
+    this%prank = 1
+  end subroutine FinOneBodyOperator
+
+  subroutine SetOneBodyOperator( this, opname, zeta, NMesh, xmax )
+    class(OneBodyOperator), intent(inout) :: this
+    character(*), intent(in) :: opname
+    real(8), intent(in) :: zeta
+    real(8), intent(in), optional :: xmax
+    integer, intent(in), optional :: NMesh
+    real(8) :: xxmax = 0.d0
+    integer :: NNMesh = 0
+
+    if(present(xmax)) xxmax = xmax
+    if(present(NMesh)) NNMesh = NMesh
+    select case(opname)
+    case("kinetic_laguerre")
+      call set_kinetic_laguerre(this, this%sps, zeta)
+    case("kinetic_ho")
+      call set_kinetic_ho(this, this%sps, zeta)
+    case("kinetic_hydrogen")
+      if(.not. present( xmax ) ) stop "Input pmax needed"
+      if(.not. present( NMesh ) ) stop "Input NMesh needed"
+      call set_kinetic_hydrogen(this, this%sps, zeta, NNMesh, xxmax)
+    case("coulomb_laguerre")
+      if(.not. present( xmax ) ) stop "Input pmax needed"
+      if(.not. present( NMesh ) ) stop "Input NMesh needed"
+      call set_coulomb_laguerre(this, this%sps, zeta, NNMesh, xxmax)
+    case("coulomb_ho")
+      if(.not. present( xmax ) ) stop "Input pmax needed"
+      if(.not. present( NMesh ) ) stop "Input NMesh needed"
+      call set_coulomb_ho(this, this%sps, zeta, NNMesh, xxmax)
+    case("coulomb_hydrogen")
+      if(.not. present( xmax ) ) stop "Input pmax needed"
+      if(.not. present( NMesh ) ) stop "Input NMesh needed"
+      call set_coulomb_hydrogen(this, this%sps, zeta, NNMesh, xxmax)
+    case("kinetic_correction_laguerre")
+      if(.not. present( xmax ) ) stop "Input pmax needed"
+      if(.not. present( NMesh ) ) stop "Input NMesh needed"
+      call set_kinetic_correction_laguerre(this, this%sps, zeta, NNMesh, xxmax)
+    case("Darwin_laguerre")
+      call set_Darwin_laguerre(this, this%sps, zeta)
+    case("spin_orbit_laguerre")
+      if(.not. present( xmax ) ) stop "Input pmax needed"
+      if(.not. present( NMesh ) ) stop "Input NMesh needed"
+      call set_spin_orbit_laguerre(this, this%sps, zeta, NNMesh, xxmax)
+    end select
+  end subroutine SetOneBodyOperator
+
   subroutine set_kinetic_laguerre(this, sps, zeta)
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta
     integer :: a, b
@@ -37,7 +109,7 @@ contains
 
   subroutine set_kinetic_ho(this, sps, zeta)
     use AtLibrary, only: hc, m_e
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta
     integer :: a, b
@@ -65,7 +137,7 @@ contains
 
   subroutine set_kinetic_hydrogen(this, sps, zeta, NMesh, pmax)
     use AtLibrary, only: hc, m_e, gauss_legendre, hydrogen_radial_wf_mom_norm
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, pmax
     integer, intent(in) :: NMesh
@@ -134,7 +206,7 @@ contains
     use AtLibrary, only: hc, m_e, gauss_legendre, &
         & fixed_point_quadrature, ln_gamma, laguerre, &
         & laguerre_radial_wf_norm
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, rmax
     integer, intent(in) :: NMesh
@@ -185,7 +257,7 @@ contains
   subroutine set_coulomb_HO(this, sps, zeta, NMesh, rmax)
     use AtLibrary, only: hc, m_e, gauss_legendre, &
         & ho_radial_wf_norm
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, rmax
     integer, intent(in) :: NMesh
@@ -226,7 +298,7 @@ contains
   subroutine set_coulomb_hydrogen(this, sps, zeta, NMesh, rmax)
     use AtLibrary, only: hc, m_e, gauss_legendre, &
         & hydrogen_radial_wf_norm
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, rmax
     integer, intent(in) :: NMesh
@@ -267,7 +339,7 @@ contains
   subroutine set_kinetic_correction_laguerre(this, sps, zeta, NMesh, pmax)
     use AtLibrary, only: hc, m_e, gauss_legendre, &
         & Mom_laguerre_radial_wf_norm, alpha
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, pmax
     integer, intent(in) :: NMesh
@@ -309,7 +381,7 @@ contains
 
   subroutine set_Darwin_laguerre(this, sps, zeta)
     use AtLibrary, only: laguerre_radial_wf, alpha
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta
     integer :: a, b
@@ -334,7 +406,7 @@ contains
     use AtLibrary, only: hc, m_e, gauss_legendre, &
         & fixed_point_quadrature, ln_gamma, laguerre, &
         & laguerre_radial_wf_norm, alpha, g_s
-    type(AtomicHamilChan), intent(inout) :: this
+    type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, rmax
     integer, intent(in) :: NMesh
