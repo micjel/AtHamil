@@ -283,7 +283,8 @@ contains
 #endif
     fp = gzip_open(f,"wt")
     err = gzip_writeline(fp, trim(header), len_trim(header))
-    cnt = 0
+    write(buffer,"(3i4)") ms%emax, ms%e2max, sps%lmax
+    err = gzip_writeline(fp, trim(buffer), len_trim(buffer))
 
     do bra = 1, sps%norbs
       do ket = 1, bra

@@ -112,7 +112,7 @@ contains
         do l = 0, sps%emax
           r = 0.d0
           do i = 1, NMesh
-            r = r + (Mesh(i)*zeta)**2 * WMesh(i) * &
+            r = r + 0.5d0 * (Mesh(i)*zeta)**2 * WMesh(i) * &
                 & Mom_laguerre_radial_wf_norm(na,l,1.d0,Mesh(i)) * &
                 & Mom_laguerre_radial_wf_norm(nb,l,1.d0,Mesh(i))
           end do
@@ -365,7 +365,7 @@ contains
 #endif
     fp = gzip_open(f,"wt")
     err = gzip_writeline(fp, trim(header), len_trim(header))
-    write(buffer,"(2i3)") this%jrank, this%prank
+    write(buffer,"(5i4)") this%jrank, this%prank, ms%emax, ms%e2max, sps%lmax
     err = gzip_writeline(fp, trim(buffer), len_trim(buffer))
 
     do bra = 1, sps%norbs
