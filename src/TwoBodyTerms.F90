@@ -173,6 +173,7 @@ contains
     if( ch == 0 ) return
     bra = this%ms%jp(ch)%labels2n(a,b)
     ket = this%ms%jp(ch)%labels2n(c,d)
+    if( bra * ket == 0 ) return
     phase = this%ms%jp(ch)%iphase(a,b) * this%ms%jp(ch)%iphase(c,d)
     me = this%MatCh(ch,ch)%m(bra,ket) * dble(phase)
   end function GetTBME_scalar

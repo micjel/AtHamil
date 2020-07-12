@@ -171,7 +171,7 @@ contains
           rabdc = ee_interaction(oa, ob, od, oc, J) * (-1.d0)**((oc%j+od%j)/2-J-1)
           rbadc = ee_interaction(ob, oa, od, oc, J) * (-1.d0)**((oa%j+ob%j+oc%j+od%j)/2)
           this%MatCh(ch,ch)%m(bra,ket) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
-          this%MatCh(ch,ch)%m(ket,bra) = 0.5d0 * norm * (rabcd + rbacd + rabdc + rbadc)
+          this%MatCh(ch,ch)%m(ket,bra) = this%MatCh(ch,ch)%m(bra,ket)
         end do
       end do
       !$omp end do
@@ -321,7 +321,7 @@ contains
     !$omp do private(i2, r2, n_1, n_2, ket, n1, l1, n3, l3, i1, L, integral, r1, log_r)
     do i2 = 1, NMesh
       r2 = rmesh(i2) / zeta
-      n_1 = max(int(rmesh(i2) / rmax_ * dble(NMesh)),NMesh/20)
+      n_1 = min( max(int(rmesh(i2) / rmax_ * dble(NMesh)),NMesh/20), 19*NMesh/20)
       n_2 = NMesh - n_1
       call gauss_legendre(0.d0, rmesh(i2), r_1, w_1, n_1)
       call gauss_legendre(rmesh(i2), rmax_, r_2, w_2, n_2)

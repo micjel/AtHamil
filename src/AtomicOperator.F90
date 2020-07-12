@@ -239,18 +239,23 @@ contains
   subroutine set_field_shift_0th_order( this, zeta )
     type(OneBodyOperator), intent(inout) :: this
     real(8), intent(in) :: zeta
-    integer :: a
-    type(EleSingleParticleOrbit), pointer :: oa
+    integer :: a, b
+    type(EleSingleParticleOrbit), pointer :: oa, ob
     real(8) :: r
     type(EleOrbits), pointer :: sps
     sps => this%sps
     do a = 1, sps%norbs
       oa => sps%orb(a)
       if(oa%l /= 0 ) cycle
-      r = 2.d0 * pi * &
-          & laguerre_radial_wf(oa%n,oa%l,1.d0/zeta,0.d0) * &
-          & laguerre_radial_wf(oa%n,oa%l,1.d0/zeta,0.d0) / 3.d0
-      this%m(a,a) = r
+      do b = 1, sps%norbs
+        ob => sps%orb(b)
+        if( oa%l /= ob%l ) cycle
+        if( oa%j /= ob%j ) cycle
+        r = 2.d0 * pi * laguerre_radial_wf(oa%n,oa%l,1.d0/zeta,0.d0) * &
+            &           laguerre_radial_wf(ob%n,ob%l,1.d0/zeta,0.d0) / &
+            & (3.d0 * 4.d0 * pi * (dble(oa%j+1)))
+        this%m(a,b) = r
+      end do
     end do
   end subroutine set_field_shift_0th_order
 
