@@ -54,7 +54,7 @@ contains
     if(present(NMesh)) NNMesh = NMesh
     select case(opname)
     case("kinetic_laguerre")
-      call set_kinetic_laguerre(this, this%sps, zeta)
+      call set_kinetic_laguerre(this, this%sps, zeta, NMesh, xxmax)
     case("kinetic_ho")
       call set_kinetic_ho(this, this%sps, zeta)
     case("kinetic_hydrogen")
@@ -86,13 +86,26 @@ contains
     end select
   end subroutine SetOneBodyOperator
 
-  subroutine set_kinetic_laguerre(this, sps, zeta)
+  subroutine set_kinetic_laguerre(this, sps, zeta, NMesh, pmax)
+    use AtLibrary, only: Mom_laguerre_radial_wf_norm, gauss_legendre
     type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
-    real(8), intent(in) :: zeta
+    real(8), intent(in) :: zeta, pmax
+    integer, intent(in) :: NMesh
+    integer :: n, l, i
     integer :: a, b
     type(EleSingleParticleOrbit), pointer :: oa, ob
     real(8) :: r
+    call gauss_legendre(0.d0, pmax, pmesh, pwmesh, NMesh)
+    allocate(rnl_mom(NMesh, 0:sps%emax, 0:sps%lmax))
+    rnl_mom(:,:,:) = 0.d0
+    do n = 0, sps%emax
+      do l = 0, sps%lmax
+        do i = 1, NMesh
+          rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, dble(l), 1.d0, pmesh(i))
+        end do
+      end do
+    end do
 
     do a = 1, sps%norbs
       oa => sps%orb(a)
@@ -100,11 +113,17 @@ contains
         ob => sps%orb(b)
         if(oa%j /= ob%j) cycle
         if(oa%l /= ob%l) cycle
-        r = kinetic_energy_laguerre_func(oa%n,ob%n,oa%l) * zeta**2
-        this%m(a,b) = r
-        this%m(b,a) = r
+        r = 0.d0
+        do i = 1, NMesh
+          r = r + pwmesh(i) * rnl_mom(i,oa%n,oa%l) * rnl_mom(i,ob%n,ob%l) * &
+              & (pmesh(i)*zeta)**2
+        end do
+        this%m(a,b) = 0.5d0 * r
+        this%m(b,a) = 0.5d0 * r
       end do
     end do
+    deallocate(rnl_mom)
+    deallocate(pmesh, pwmesh)
   end subroutine set_kinetic_laguerre
 
   subroutine set_kinetic_ho(this, sps, zeta)
@@ -205,7 +224,7 @@ contains
   subroutine set_coulomb_laguerre(this, sps, zeta, NMesh, rmax)
     use AtLibrary, only: hc, m_e, gauss_legendre, &
         & fixed_point_quadrature, ln_gamma, laguerre, &
-        & laguerre_radial_wf_norm
+        & laguerre_radial_wf_norm, laguerre_radial_wf_norm_glmesh
     type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, rmax
@@ -227,10 +246,9 @@ contains
       do l = 0, sps%lmax
         do i = 1, NMesh
 #ifdef gauss_laguerre
-          rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
-              & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
+          rnl(i,n,l) = laguerre_radial_wf_norm_glmesh( n, dble(l), 1.d0, rmesh(i) )
 #else
-          rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
+          rnl(i,n,l) = laguerre_radial_wf_norm(n, dble(l), 1.d0, rmesh(i))
 #endif /* gauss_laguerre */
         end do
       end do
@@ -354,7 +372,7 @@ contains
     do n = 0, sps%emax
       do l = 0, sps%lmax
         do i = 1, NMesh
-          rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, l, 1.d0, pmesh(i))
+          rnl_mom(i,n,l) = Mom_laguerre_radial_wf_norm(n, dble(l), 1.d0, pmesh(i))
         end do
       end do
     end do
@@ -395,7 +413,7 @@ contains
         if(oa%j /= ob%j) cycle
         if(oa%l /= ob%l) cycle
         if(oa%l /= 0) cycle
-        r = 0.125d0 * laguerre_radial_wf(oa%n,0,1.d0/zeta,0.d0) * laguerre_radial_wf(ob%n,0,1.d0/zeta,0.d0) / alpha**2
+        r = 0.125d0 * laguerre_radial_wf(oa%n,0.d0,1.d0/zeta,0.d0) * laguerre_radial_wf(ob%n,0.d0,1.d0/zeta,0.d0) / alpha**2
         this%m(a,b) = r
         this%m(b,a) = r
       end do
@@ -405,7 +423,7 @@ contains
   subroutine set_spin_orbit_laguerre(this, sps, zeta, NMesh, rmax)
     use AtLibrary, only: hc, m_e, gauss_legendre, &
         & fixed_point_quadrature, ln_gamma, laguerre, &
-        & laguerre_radial_wf_norm, alpha, g_s
+        & laguerre_radial_wf_norm, alpha, g_s, laguerre_radial_wf_norm_glmesh
     type(OneBodyOperator), intent(inout) :: this
     type(EleOrbits), intent(in), target :: sps
     real(8), intent(in) :: zeta, rmax
@@ -427,10 +445,9 @@ contains
       do l = 0, sps%lmax
         do i = 1, NMesh
 #ifdef gauss_laguerre
-          rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
-              & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
+          rnl(i,n,l) = laguerre_radial_wf_norm_glmesh( n, dble(l), 1.d0, rmesh(i))
 #else
-          rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
+          rnl(i,n,l) = laguerre_radial_wf_norm(n, dble(l), 1.d0, rmesh(i))
 #endif /* gauss_laguerre */
         end do
       end do

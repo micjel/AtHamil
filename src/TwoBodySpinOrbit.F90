@@ -69,10 +69,9 @@ contains
       do l = 0, ms%sps%lmax
         do i = 1, NMesh
 #ifdef gauss_laguerre
-          rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
-              & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
+          rnl(i,n,l) = laguerre_radial_wf_norm_glmesh(n, dble(l), 1.d0, rmesh(i))
 #else
-          rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
+          rnl(i,n,l) = laguerre_radial_wf_norm(n, dble(l), 1.d0, rmesh(i))
 #endif
         end do
       end do
@@ -411,10 +410,12 @@ contains
         n3 = this%n2(ket)
         l3 = this%l2(ket)
         do i1 = 1, n_1
-          dRnl1(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) * d_laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+          dRnl1(i1) = laguerre_radial_wf_norm(n1,dble(l1),1.d0,r_1(i1)) * &
+              & d_laguerre_radial_wf_norm(n3,dble(l3),1.d0,r_1(i1)) * w_1(i1)
         end do
         do i1 = 1, n_2
-          dRnl2(i1) = laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) * d_laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
+          dRnl2(i1) = laguerre_radial_wf_norm(n1,dble(l1),1.d0,r_2(i1)) * &
+              & d_laguerre_radial_wf_norm(n3,dble(l3),1.d0,r_2(i1)) * w_2(i1)
         end do
 
         do L = abs(l1-l3)-1, l1+l3+1
@@ -511,10 +512,12 @@ contains
         n3 = this%n2(ket)
         l3 = this%l2(ket)
         do i1 = 1, n_1
-          Rnl1(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+          Rnl1(i1) =  laguerre_radial_wf_norm(n1,dble(l1),1.d0,r_1(i1)) * &
+              & laguerre_radial_wf_norm(n3,dble(l3),1.d0,r_1(i1)) * w_1(i1)
         end do
         do i1 = 1, n_2
-          Rnl2(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
+          Rnl2(i1) =  laguerre_radial_wf_norm(n1,dble(l1),1.d0,r_2(i1)) * &
+              & laguerre_radial_wf_norm(n3,dble(l3),1.d0,r_2(i1)) * w_2(i1)
         end do
 
         do L = abs(l1-l3)-1, l1+l3+1
@@ -611,7 +614,8 @@ contains
         n3 = this%n2(ket)
         l3 = this%l2(ket)
         do i1 = 1, n_1
-          Rnl1(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_1(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_1(i1)) * w_1(i1)
+          Rnl1(i1) =  laguerre_radial_wf_norm(n1,dble(l1),1.d0,r_1(i1)) * &
+              & laguerre_radial_wf_norm(n3,dble(l3),1.d0,r_1(i1)) * w_1(i1)
         end do
         do i1 = 1, n_2
           Rnl2(i1) =  0.d0
@@ -715,7 +719,8 @@ contains
           Rnl1(i1) =  0.d0
         end do
         do i1 = 1, n_2
-          Rnl2(i1) =  laguerre_radial_wf_norm(n1,l1,1.d0,r_2(i1)) *   laguerre_radial_wf_norm(n3,l3,1.d0,r_2(i1)) * w_2(i1)
+          Rnl2(i1) =  laguerre_radial_wf_norm(n1,dble(l1),1.d0,r_2(i1)) * &
+              & laguerre_radial_wf_norm(n3,dble(l3),1.d0,r_2(i1)) * w_2(i1)
         end do
 
         do L = abs(l1-l3)-1, l1+l3+1

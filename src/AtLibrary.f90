@@ -188,6 +188,32 @@ module AtLibrary
     procedure :: real2str
     procedure :: str2str
   end interface str
+
+#if defined(Ldependence)
+  interface Laguerre_radial_wf
+    procedure :: Laguerre_radial_wf_Ldep
+  end interface Laguerre_radial_wf
+
+  interface Mom_Laguerre_radial_wf
+    procedure :: Mom_Laguerre_radial_wf_Ldep
+  end interface Mom_Laguerre_radial_wf
+
+  interface Laguerre_radial_wf_norm_glmesh
+    procedure :: Laguerre_radial_wf_norm_Ldep_glmesh
+  end interface Laguerre_radial_wf_norm_glmesh
+#else
+  interface Laguerre_radial_wf
+    procedure :: Laguerre_radial_wf_no_Ldep
+  end interface Laguerre_radial_wf
+
+  interface Mom_Laguerre_radial_wf
+    procedure :: Mom_Laguerre_radial_wf_no_Ldep
+  end interface Mom_Laguerre_radial_wf
+
+  interface Laguerre_radial_wf_norm_glmesh
+    procedure :: Laguerre_radial_wf_norm_no_Ldep_glmesh
+  end interface Laguerre_radial_wf_norm_glmesh
+#endif
   integer, private, parameter :: Lenc = 256
 contains
 
@@ -378,11 +404,30 @@ contains
     s = prefact * exp(exp_component) * laguerre(n-l-1,dble(2*l+1),x)
   end function hydrogen_radial_wf_norm
 
-  function Laguerre_radial_wf(n,l,b,r) result(s)
+  function Laguerre_radial_wf_Ldep(n,l,bb,r) result(s)
     ! From Eq.(13) in A. E. McCoy and M. A. Caprio, J. Math. Phys. 57, (2016).
     ! b is length scale [L]
-    integer,intent(in) :: n,l
-    real(8),intent(in) :: b,r
+    integer,intent(in) :: n
+    real(8),intent(in) :: bb,r,l
+    real(8) :: s, b
+    real(8) :: prefact, exp_component, x, x2
+    b = bb / (0.5d0*l+1.d0)
+    x = r / b
+    x2 = 2.d0 * x
+    prefact = sqrt( 2.d0 / b ) * 2.d0 / b
+    exp_component = 0.5d0*ln_gamma(dble(n+1)) - &
+        & 0.5d0*ln_gamma(dble(n+2*l+3)) - x
+    if(abs(x2) > 1.d-16) then
+      exp_component = exp_component  + dble(l)*log(x2)
+    end if
+    s = prefact * exp(exp_component) * laguerre(n,dble(2*l+2),x2)
+  end function Laguerre_radial_wf_Ldep
+
+  function Laguerre_radial_wf_no_Ldep(n,l,b,r) result(s)
+    ! From Eq.(13) in A. E. McCoy and M. A. Caprio, J. Math. Phys. 57, (2016).
+    ! b is length scale [L]
+    integer,intent(in) :: n
+    real(8),intent(in) :: b,r,l
     real(8) :: s
     real(8) :: prefact, exp_component, x, x2
     x = r / b
@@ -394,63 +439,60 @@ contains
       exp_component = exp_component  + dble(l)*log(x2)
     end if
     s = prefact * exp(exp_component) * laguerre(n,dble(2*l+2),x2)
-  end function Laguerre_radial_wf
-
-  function Laguerre_radial_wf_(n,l,b,r) result(s)
-    ! From Eq.(13) in A. E. McCoy and M. A. Caprio, J. Math. Phys. 57, (2016).
-    ! b is length scale [L]
-    integer,intent(in) :: n
-    real(8),intent(in) :: l,b,r
-    real(8) :: s
-    real(8) :: prefact, exp_component, x, x2
-    x = r / b
-    x2 = 2.d0 * x
-    prefact = sqrt( 2.d0 / b ) * 2.d0 / b
-    exp_component = 0.5d0*ln_gamma(dble(n+1)) - &
-        & 0.5d0*ln_gamma(dble(n+3)+2.d0*l) - x
-    if(abs(x2) > 1.d-16) then
-      exp_component = exp_component  + l*log(x2)
-    end if
-    s = prefact * exp(exp_component) * laguerre(n,2.d0*l+2.d0,x2)
-  end function Laguerre_radial_wf_
+  end function Laguerre_radial_wf_no_Ldep
 
   function Laguerre_radial_wf_norm(n,l,b,r) result(s)
     ! From Eq.(13) in A. E. McCoy and M. A. Caprio, J. Math. Phys. 57, (2016).
     ! b is length scale [L]
-    integer,intent(in) :: n,l
-    real(8),intent(in) :: b,r
+    integer,intent(in) :: n
+    real(8),intent(in) :: b,r,l
     real(8) :: s
-    real(8) :: prefact, exp_component, x, x2
-    x = r / b
-    x2 = 2.d0 * x
-    prefact = sqrt( 2.d0 / b )
-    exp_component = 0.5d0*ln_gamma(dble(n+1)) - &
-        & 0.5d0*ln_gamma(dble(n+2*l+3)) - x  + dble(l+1) * log(x2)
-    s = prefact * exp(exp_component) * laguerre(n,dble(2*l+2),x2)
+    s = r * Laguerre_radial_wf(n,l,b,r)
   end function Laguerre_radial_wf_norm
 
   function d_Laguerre_radial_wf_norm(n,l,b,r) result(s)
-    integer, intent(in) :: n, l
-    real(8), intent(in) :: b, r
+    integer, intent(in) :: n
+    real(8), intent(in) :: b, r, l
     real(8) :: s
     s = d_Laguerre_radial_wf(n,l,b,r) * r
   end function d_Laguerre_radial_wf_norm
 
-  function d_Laguerre_radial_wf(n,l,b,r) result(s)
-    integer, intent(in) :: n, l
-    real(8), intent(in) :: b, r
-    real(8) :: x, s
+  function d_Laguerre_radial_wf(n,l,bb,r) result(s)
+    integer, intent(in) :: n
+    real(8), intent(in) :: bb, r, l
+    real(8) :: x, s, b
+    b = bb / (0.5d0*l+1.d0)
     s = 0.d0
     x = 2.d0 * r / b
     s = 2.d0 / b * (dble(l) / x - 0.5d0) * Laguerre_radial_wf(n,l,b,r)
     if(n==0) return
-    s = s - 2.d0/b * sqrt(dble(n)) / sqrt(x) * Laguerre_radial_wf_(n-1,dble(l)+0.5d0,b,r)
+    s = s - 2.d0/b * sqrt(dble(n)) / sqrt(x) * Laguerre_radial_wf(n-1,dble(l)+0.5d0,b,r)
   end function d_Laguerre_radial_wf
 
-  function Mom_Laguerre_radial_wf_norm(n,l,b,p) result(s)
+  function Mom_Laguerre_radial_wf_Ldep(n,l,bb,p) result(s)
     ! b is length scale [L]
-    integer,intent(in) :: n,l
-    real(8),intent(in) :: b,p
+    integer,intent(in) :: n
+    real(8),intent(in) :: bb,p,l
+    real(8) :: s, b
+    real(8) :: exp_prefact, exp_component, x, xi
+    integer :: k
+    b = bb / (0.5d0*l+1.d0)
+    xi = b * p * 0.5d0
+    x = 0.5d0 / sqrt(0.25d0 + xi*xi)
+    s = 0.d0
+    exp_prefact = 0.5d0*ln_gamma(dble(n+1)) + 0.5d0*ln_gamma(dble(n+2*l+3)) + &
+      & dble(2*l+3)*log(2.d0*x) + dble(l)*log(2.d0*xi) + ln_gamma(dble(l+1))
+    do k = 0, n
+      exp_component = dble(k)*log(2.d0*x) - ln_gamma(dble(n+1-k)) - ln_gamma(dble(2*l+k+3)) + exp_prefact
+      s = s + (-1.d0)**k * dble(k+1) * Gegenbauer_polynomial(k+1,dble(l+1),x) * exp(exp_component)
+    end do
+    s = s * sqrt(b / pi) * b * 0.5d0
+  end function Mom_Laguerre_radial_wf_Ldep
+
+  function Mom_Laguerre_radial_wf_no_Ldep(n,l,b,p) result(s)
+    ! b is length scale [L]
+    integer,intent(in) :: n
+    real(8),intent(in) :: b,p,l
     real(8) :: s
     real(8) :: exp_prefact, exp_component, x, xi
     integer :: k
@@ -463,8 +505,33 @@ contains
       exp_component = dble(k)*log(2.d0*x) - ln_gamma(dble(n+1-k)) - ln_gamma(dble(2*l+k+3)) + exp_prefact
       s = s + (-1.d0)**k * dble(k+1) * Gegenbauer_polynomial(k+1,dble(l+1),x) * exp(exp_component)
     end do
-    s = s * sqrt(b / pi) * xi
+    s = s * sqrt(b / pi) * b * 0.5d0
+  end function Mom_Laguerre_radial_wf_no_Ldep
+
+  function Mom_Laguerre_radial_wf_norm(n,l,b,p) result(s)
+    ! b is length scale [L]
+    integer,intent(in) :: n
+    real(8),intent(in) :: b,p,l
+    real(8) :: s
+    s = p * Mom_Laguerre_radial_wf(n,l,b,p)
   end function Mom_Laguerre_radial_wf_norm
+
+  function Laguerre_radial_wf_norm_Ldep_glmesh(n,l,bb,r) result(s)
+    integer,intent(in) :: n
+    real(8),intent(in) :: bb,r,l
+    real(8) :: s, b
+    b = bb / (0.5d0*l+1.d0)
+    s = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
+        & laguerre(n,dble(2*l+2),2.d0*r/b) * (2.d0*r/b)**(l+1) * sqrt(2.d0/b)
+  end function Laguerre_radial_wf_norm_Ldep_glmesh
+
+  function Laguerre_radial_wf_norm_no_Ldep_glmesh(n,l,b,r) result(s)
+    integer,intent(in) :: n
+    real(8),intent(in) :: b,r,l
+    real(8) :: s
+    s = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
+        & laguerre(n,dble(2*l+2),2.d0*r/b) * (2.d0*r/b)**(l+1) * sqrt(2.d0/b)
+  end function Laguerre_radial_wf_norm_no_Ldep_glmesh
 
   function hydrogen_radial_wf_mom_norm(n,l,a_star,p) result(s)
     ! from wikipedia https://en.wikipedia.org/wiki/Hydrogen_atom

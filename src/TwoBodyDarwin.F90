@@ -56,10 +56,9 @@ contains
       do l = 0, ms%sps%lmax
         do i = 1, NMesh
 #ifdef gauss_laguerre
-          rnl(i,n,l) = exp( 0.5d0*ln_gamma(dble(n+1)) - 0.5d0*ln_gamma(dble(n+2*l+3))) * &
-              & laguerre(n,dble(2*l+2),2.d0*rmesh(i)) * (2.d0*rmesh(i))**(l+1) * sqrt(2.d0)
+          rnl(i,n,l) = laguerre_radial_wf_norm_glmesh(n, dble(l), 1.d0, rmesh(i))
 #else
-          rnl(i,n,l) = laguerre_radial_wf_norm(n, l, 1.d0, rmesh(i))
+          rnl(i,n,l) = laguerre_radial_wf_norm(n, dble(l), 1.d0, rmesh(i))
 #endif
         end do
       end do

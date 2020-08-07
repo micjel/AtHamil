@@ -58,6 +58,10 @@ contains
     select case( this%OpName )
     case("MassShift")
       call set_mass_shift( this, NMesh, pmax )
+    case("NormalMassShift")
+      call set_psquare_one_body( this%one, this%ms%zeta, NMesh, pmax )
+    case("SpecificMassShift")
+      call set_p_dot_p_two_body( this%two, NMesh, pmax )
     case("FieldShift")
       call set_field_shift( this )
     end select
@@ -113,8 +117,8 @@ contains
           r = 0.d0
           do i = 1, NMesh
             r = r + 0.5d0 * (Mesh(i)*zeta)**2 * WMesh(i) * &
-                & Mom_laguerre_radial_wf_norm(na,l,1.d0,Mesh(i)) * &
-                & Mom_laguerre_radial_wf_norm(nb,l,1.d0,Mesh(i))
+                & Mom_laguerre_radial_wf_norm(na,dble(l),1.d0,Mesh(i)) * &
+                & Mom_laguerre_radial_wf_norm(nb,dble(l),1.d0,Mesh(i))
           end do
           sp_radial_integrals(na,nb,l,l) = r
         end do
@@ -141,7 +145,7 @@ contains
     type(TwoBodyOperator), intent(inout) :: this
     real(8), intent(in) :: pmax
     integer, intent(in) :: NMesh
-    integer :: na, nb, la, lb, i, ch, J
+    integer :: na, nb, la, lb, ch, J, i
     integer :: bra, ket, a, b, c, d
     type(EleOrbits), pointer :: sps
     type(EleTwoBodySpace), pointer :: ms
@@ -154,6 +158,8 @@ contains
     allocate( sp_radial_integrals( 0:sps%emax, 0:sps%emax, 0:sps%emax, 0:sps%emax) )
     sp_radial_integrals(:,:,:,:) = 0.d0
     call gauss_legendre(0.d0, pmax, Mesh, WMesh, NMesh)
+
+
     do na = 0, sps%emax
       do nb = 0, sps%emax
         do la = 0, sps%emax
@@ -165,24 +171,39 @@ contains
             rr = 0.d0
             if( la == lb+1 ) then
               do i = 1, NMesh
-                rr = rr + zeta * WMesh(i) * Laguerre_radial_wf_norm(na,la,1.d0,Mesh(i)) * &
-                    & (                 d_Laguerre_radial_wf_norm(nb,lb,1.d0,Mesh(i) ) - &
-                    & dble(lb) / Mesh(i) * Laguerre_radial_wf_norm( nb,lb,1.d0,Mesh(i)) ) * fact
+                rr = rr + zeta * WMesh(i) * Laguerre_radial_wf_norm(na,dble(la),1.d0,Mesh(i)) * &
+                    & (                 d_Laguerre_radial_wf_norm(nb,dble(lb),1.d0,Mesh(i) ) - &
+                    & dble(lb) / Mesh(i) * Laguerre_radial_wf_norm( nb,dble(lb),1.d0,Mesh(i)) ) * fact
               end do
             end if
             if( la == lb-1 ) then
               do i = 1, NMesh
-                rr = rr + zeta * WMesh(i) * Laguerre_radial_wf_norm(na,la,1.d0,Mesh(i)) * &
-                    & (                    d_Laguerre_radial_wf_norm( nb,lb,1.d0,Mesh(i) ) + &
-                    & dble(lb+1) / Mesh(i) * Laguerre_radial_wf_norm( nb,lb,1.d0,Mesh(i))) * fact
+                rr = rr + zeta * WMesh(i) * Laguerre_radial_wf_norm(na,dble(la),1.d0,Mesh(i)) * &
+                    & (                    d_Laguerre_radial_wf_norm( nb,dble(lb),1.d0,Mesh(i) ) + &
+                    & dble(lb+1) / Mesh(i) * Laguerre_radial_wf_norm( nb,dble(lb),1.d0,Mesh(i))) * fact
               end do
             end if
+
+            ! -- test --
+            !if( la == lb+1 ) then
+            !  do i = 1, NMesh
+            !    rr = rr + zeta * WMesh(i) * ho_radial_wf_norm(na,la,1.d0,Mesh(i)) * &
+            !        & (                 d_ho_radial_wf_norm(nb,lb,1.d0,Mesh(i) ) - &
+            !        & dble(lb) / Mesh(i) * ho_radial_wf_norm( nb,lb,1.d0,Mesh(i)) ) * fact
+            !  end do
+            !end if
+            !if( la == lb-1 ) then
+            !  do i = 1, NMesh
+            !    rr = rr + zeta * WMesh(i) * ho_radial_wf_norm(na,la,1.d0,Mesh(i)) * &
+            !        & (                    d_ho_radial_wf_norm( nb,lb,1.d0,Mesh(i) ) + &
+            !        & dble(lb+1) / Mesh(i) * ho_radial_wf_norm( nb,lb,1.d0,Mesh(i))) * fact
+            !  end do
+            !end if
             !do i = 1, NMesh
             !  r = r + (Mesh(i)*zeta) * WMesh(i) * &
             !      & Mom_laguerre_radial_wf_norm(na,la,1.d0,Mesh(i)) * &
             !      & Mom_laguerre_radial_wf_norm(nb,lb,1.d0,Mesh(i)) * fact * (-1.d0)**( (la-lb+1)/2 )
             !end do
-            !write(*,*) na,la,nb,lb,r, rr
             sp_radial_integrals(na,nb,la,lb) = rr
           end do
         end do
@@ -201,15 +222,16 @@ contains
           d = tbc%n2label2(ket)
           r = p_dot_p( a, b, c, d, J )
           this%MatCh(ch,ch)%m(bra,ket) = r
+          this%MatCh(ch,ch)%m(ket,bra) = r
         end do
       end do
     end do
     deallocate(sp_radial_integrals)
   contains
-    function p_dot_p( a, b, c, d, J ) result(r)
+    function p_dot_p( a, b, c, d, J ) result(s)
       integer, intent(in) :: a, b, c, d, J
       type(EleSingleParticleOrbit), pointer :: oa, ob, oc, od
-      real(8) :: r, norm
+      real(8) :: s, norm
       oa => sps%orb(a)
       ob => sps%orb(b)
       oc => sps%orb(c)
@@ -217,22 +239,21 @@ contains
       norm = 1.d0
       if(a==b) norm = norm * dsqrt(0.5d0)
       if(c==d) norm = norm * dsqrt(0.5d0)
-      r = - (-1.d0)**( (ob%j+oc%j)/2+J ) * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2) * red_nab_j(a,c) * red_nab_j(b,d) - &
+      s = - (-1.d0)**( (ob%j+oc%j)/2+J ) * sjs(oa%j, ob%j, 2*J, od%j, oc%j, 2) * red_nab_j(a,c) * red_nab_j(b,d) - &
           & (-1.d0)**( (ob%j+oc%j)/2 ) * sjs(oa%j, ob%j, 2*J, oc%j, od%j, 2) * red_nab_j(a,d) * red_nab_j(b,c)
+      s = s * norm
     end function p_dot_p
 
-    function red_nab_j(a, b) result(r)
+    function red_nab_j( a, b) result(ss)
       integer, intent(in) :: a, b
-      real(8) :: r
-      type(EleSingleParticleOrbit), pointer :: oa, ob, oc, od
+      real(8) :: ss
+      type(EleSingleParticleOrbit), pointer :: oa, ob
       oa => sps%orb(a)
       ob => sps%orb(b)
-      oc => sps%orb(c)
-      od => sps%orb(d)
-      r = (-1.d0)**((3+2*oa%l+ob%j)/2) * &
+      ss = (-1.d0)**((3+2*oa%l+ob%j)/2) * &
           & dsqrt(dble(oa%j + 1) * dble(ob%j + 1)) * &
           & sjs(oa%j, 2, ob%j, 2*ob%l, 1, 2*oa%l) * &
-          & sp_radial_integrals(oa%n,oa%l,ob%n,ob%l)
+          & sp_radial_integrals(oa%n,ob%n,oa%l,ob%l)
     end function red_nab_j
   end subroutine set_p_dot_p_two_body
 
@@ -251,8 +272,8 @@ contains
         ob => sps%orb(b)
         if( oa%l /= ob%l ) cycle
         if( oa%j /= ob%j ) cycle
-        r = 2.d0 * pi * laguerre_radial_wf(oa%n,oa%l,1.d0/zeta,0.d0) * &
-            &           laguerre_radial_wf(ob%n,ob%l,1.d0/zeta,0.d0) / &
+        r = 2.d0 * pi * laguerre_radial_wf(oa%n,dble(oa%l),1.d0/zeta,0.d0) * &
+            &           laguerre_radial_wf(ob%n,dble(ob%l),1.d0/zeta,0.d0) / &
             & (3.d0 * 4.d0 * pi * (dble(oa%j+1)))
         this%m(a,b) = r
       end do
@@ -352,9 +373,9 @@ contains
     character(*), intent(in) :: f
     type(EleTwoBodySpace), pointer :: ms
     type(EleOrbits), pointer :: sps
-    integer :: a, b, c, d, bra, ket, Jab, Jcd, ch
+    integer :: a, b, c, d, bra, ket, Jab, Jcd
     type(EleSingleParticleOrbit), pointer :: oa, ob, oc, od
-    integer :: cnt, n, line
+    integer :: cnt, line
     character(256) :: header
     type(c_ptr) :: fp, err
     character(kind=c_char, len=200) :: buffer

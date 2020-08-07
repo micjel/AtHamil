@@ -1,6 +1,6 @@
-obj/AtLibrary.o : src/AtLibrary.f90 
+obj/AtLibrary.o : src/AtLibrary.F90 
 obj/AtomicHamiltonian.o : src/AtomicHamiltonian.F90 obj/TwoBodySpinDipole.o obj/TwoBodySpinOrbit.o obj/TwoBodyOrbitOrbit.o obj/TwoBodySpinContact.o obj/TwoBodyDarwin.o obj/TwoBodyCoulomb.o obj/AtLibrary.o obj/TwoBodyTerms.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
-obj/AtomicOperator.o : src/AtomicOperator.F90 obj/TwoBodyTerms.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
+obj/AtomicOperator.o : src/AtomicOperator.F90 obj/AtLibrary.o obj/TwoBodyTerms.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
 obj/EleSingleParticleState.o : src/EleSingleParticleState.F90 obj/AtLibrary.o 
 obj/ElectronTwoBodySpace.o : src/ElectronTwoBodySpace.F90 obj/AtLibrary.o obj/EleSingleParticleState.o 
 obj/OneBodyTerms.o : src/OneBodyTerms.F90 obj/AtLibrary.o obj/EleSingleParticleState.o obj/LinAlgLib.o 
@@ -13,7 +13,7 @@ obj/TwoBodySpinOrbit.o : src/TwoBodySpinOrbit.F90 obj/AtLibrary.o obj/ElectronTw
 obj/TwoBodyTerms.o : src/TwoBodyTerms.F90 obj/AtLibrary.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
 obj/ClassSys.o : main/ClassSys.f90 
 obj/AtHamilInput.o : main/AtHamilInput.F90 
-obj/AtHamilMain.o : main/AtHamilMain.F90 obj/AtHamilInput.o obj/AtomicHamiltonian.o obj/EleSingleParticleState.o obj/AtLibrary.o 
+obj/AtHamilMain.o : main/AtHamilMain.F90 obj/AtHamilInput.o obj/AtomicOperator.o obj/AtomicHamiltonian.o obj/EleSingleParticleState.o obj/AtLibrary.o 
 obj/LinAlgLib.o : submodules/LinAlgf90/src/LinAlgLib.f90 obj/MatVecComplex.o obj/MatVecDouble.o obj/MatVecSingle.o obj/MatrixComplex.o obj/MatrixDouble.o obj/MatrixSingle.o obj/VectorComplex.o obj/VectorDouble.o obj/VectorSingle.o obj/SingleDoubleComplex.o obj/LinAlgParameters.o 
 obj/LinAlgParameters.o : submodules/LinAlgf90/src/LinAlgParameters.f90 
 obj/MatVecComplex.o : submodules/LinAlgf90/src/MatVecComplex.f90 obj/MatrixComplex.o obj/VectorComplex.o obj/LinAlgParameters.o 

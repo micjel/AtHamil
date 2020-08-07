@@ -129,7 +129,7 @@ contains
       call this%kinetic%set( "kinetic_hydrogen", this%ms%zeta, NMesh_mom, pmax )
       call this%potential%set("coulomb_hydrogen", this%ms%zeta, NMesh, rmax )
     case("LO", "lo", "LO-2nl", "lo-2nl")
-      call this%kinetic%set("kinetic_laguerre", this%ms%zeta )
+      call this%kinetic%set("kinetic_laguerre", this%ms%zeta, NMesh_mom, pmax )
       call this%potential%set("coulomb_laguerre", this%ms%zeta, NMesh, rmax )
       if( this%OpName == "Breit") then
         call this%kinetic_p4%set("kinetic_correction_laguerre", this%ms%zeta, NMesh_mom, pmax )
