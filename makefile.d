@@ -1,4 +1,4 @@
-obj/AtLibrary.o : src/AtLibrary.F90 
+obj/AtLibrary.o : src/AtLibrary.f90 
 obj/AtomicHamiltonian.o : src/AtomicHamiltonian.F90 obj/TwoBodySpinDipole.o obj/TwoBodySpinOrbit.o obj/TwoBodyOrbitOrbit.o obj/TwoBodySpinContact.o obj/TwoBodyDarwin.o obj/TwoBodyCoulomb.o obj/AtLibrary.o obj/TwoBodyTerms.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
 obj/AtomicOperator.o : src/AtomicOperator.F90 obj/AtLibrary.o obj/TwoBodyTerms.o obj/OneBodyTerms.o obj/EleSingleParticleState.o obj/ElectronTwoBodySpace.o obj/LinAlgLib.o 
 obj/EleSingleParticleState.o : src/EleSingleParticleState.F90 obj/AtLibrary.o 
