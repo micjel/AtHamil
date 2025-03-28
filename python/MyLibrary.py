@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import numpy as np
+import math
+import time
 #from py3nj import wigner3j, wigner6j
-from sympy.physics.wigner import wigner_3j, wigner_6j
+from sympy.physics.wigner import wigner_3j, wigner_6j, wigner_9j
 from sympy import N
 from scipy.special import gamma, assoc_laguerre, eval_gegenbauer
 from scipy import integrate
@@ -23,6 +25,21 @@ def laguerre_wave_function(x, zeta, n, l):
     """
     eta = 2.0 * x / zeta
     return np.sqrt(2.0 * gamma(n+1) / (zeta * gamma(n+2*l+3)) ) * 2.0 * eta**l * np.exp(-0.5*eta) * assoc_laguerre(eta, n, 2*l+2) / zeta
+
+def dlaguerre_wave_function(x, zeta, n, l):
+    """
+    Brute force r-derivative of Laguerre radial function
+    """
+    eta = 2.0 * x / zeta
+    prefact = 2.0 / zeta * math.sqrt(2.0 * gamma(n+1) / (zeta * gamma(n+2*l+3)) )
+    
+    if l == 0:
+        return prefact*(eta**l * (-1.0) * np.exp(-0.5*eta) * assoc_laguerre(eta, n, 2*l+2) + eta**l * np.exp(-0.5*eta) * assoc_laguerre(eta, n-1, 2*l+3))
+    else:
+        dr = 2.0 / zeta * l*eta**(l-1)* np.exp(-0.5*eta) * assoc_laguerre(eta, n, 2*l+2) + \
+            eta**l * (-1.0) * np.exp(-0.5*eta) * assoc_laguerre(eta, n, 2*l+2) + \
+            eta**l * np.exp(-0.5*eta) * assoc_laguerre(eta, n-1, 2*l+3)
+        return prefact*dr
 
 def laguerre_wave_function_mom(p, zeta, n, l):
     """
@@ -51,8 +68,22 @@ def sjs(j1, j2, j3, j4, j5, j6):
     { j4 j5 j6 }
     """
     #return wigner6j(j1,j2,j3,j4,j5,j6)
-    return N(wigner_6j(0.5*j1,0.5*j2,0.5*j3,0.5*j4,0.5*j5,0.5*j6))
+    try:
+        return N(wigner_6j(0.5*j1,0.5*j2,0.5*j3,0.5*j4,0.5*j5,0.5*j6))
+    except ValueError:
+        return 0
 
+def njs(j1, j2, j3, j4, j5, j6, j7, j8, j9):
+    """
+    9-j symbol
+    { j1 j2 j3 }
+    { j4 j5 j6 }
+    { j7 j8 j9 }
+    """
+    try:
+        return N(wigner_9j(0.5*j1, 0.5*j2, 0.5*j3, 0.5*j4, 0.5*j5, 0.5*j6, 0.5*j7, 0.5*j8, 0.5*j9))
+    except ValueError:
+        return 0
 def norm_laguerre_wave_function_mom(n1, n2, l):
     """
     """
@@ -102,7 +133,28 @@ def Ck_one_body(j1, l1, j2,  l2, k):
     <j1||Ck||j2>
     '''
     if (l1+l2+k)%2==1: return 0
-    return thj(j1, j2, 2*k, 1, -1, 0)*np.sqrt((j1+1)*(j2+1))*(-1**(j2/2.+k-0.5))
+    return thj(j1, j2, 2*k, 1, -1, 0)*np.sqrt((j1+1)*(j2+1))*((-1)**(j2/2.+k-0.5))
+
+def YL(j1, l1, j2, l2, L):
+    """
+    <l1 1/2 j1 ||[Y^L] || l1 1/2 j2>
+    """
+    if (l1+l2+L)%2==1: return 0
+    return np.sqrt((j1+1)*(j2+1)*(2*L+1))/(4*np.pi)*thj(j1, 2*L, j2, -1, 0, 1)*((-1)**(j2/2.+L-0.5))
+
+def YLs(j1, l1, j2, l2, L, K):
+    """
+    <j1 ||[Y^Ls]^K || j2>
+    """
+    return np.sqrt(3/2)*np.sqrt((j1+1)*(j2+1)*(2*K+1))*njs(2*l1, 1, j1, l2, 1, j2, 2*L, 1, 2*K) \
+        *YL(j1, l1, j2, l2, L)
+
+def L_element(j1, l1, j2, l2):
+    """
+    <l1 1/2 j1 ||[L] || l1 1/2 j2>
+    """
+    if l1 != l2: return 0
+    return np.sqrt((j1+1)*(j2+1)*l1*(l1+1)*(2*l1+1))*sjs(2*l1, 2*l1, 2, j2, j1, 1)*((-1)**(j2/2.+l1-1.5))
 
 def Rkk_one_body(o1, o2, k):
     '''
@@ -112,8 +164,28 @@ def Rkk_one_body(o1, o2, k):
     for j in np.arange(np.abs(o2.j/2. - 1), o2.j/2. + 1):
         l = o2.l
         total+=Ck_one_body(o1.j, o1.l, 2*j, l, k)*sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j) * \
-                    np.sqrt((2*j+1)*(o2.j+1)*l*(l+1)*(2*l+1))*(-1**(l+o2.j/2.+1.5))*sjs(2*l, 2*l, 2, o2.j, 2*j, 1)
+                    np.sqrt((2*j+1)*(o2.j+1)*l*(l+1)*(2*l+1))*(-1)**(l+o2.j/2.+1.5)*sjs(2*l, 2*l, 2, o2.j, 2*j, 1)
     return total*(2*k+1)*(-1**(o1.j/2.+o2.j/2.+k))
+
+def YL_L(j1, l1, j2, l2, L, K):
+    """
+    < j1 || [Y^L L]^K || j2 > 
+    """
+    total = 0.
+    prefact = (-1)**(j1+j2+K)*np.sqrt(2*K+1)
+    for j in [l2 - 1/2, l2 + 1/2]:
+        total+=sjs(2*L, 2, 2*K, j2, j1, 2*j)*YL(j1, l1, 2*j, l2, L)*L_element(2*j, l2, j2, l2)
+    return prefact*total 
+
+def YL_Ls(j1, l1, j2, l2, L, K, M):
+    """
+    < j1 || [[Y^L L]^Ks]^M || j2 > 
+    """
+    prefact = (-1)**(j1+j2+M)*math.sqrt(2*M+1)
+    total = 0.
+    for j in [K - 1/2, K + 1/2]:
+        total += sjs(2*K, 2, 2*M, j2, j1, 2*j)*YL_L(j1, l1, 2*j, l2, L, K)*math.sqrt(3/2)
+    return prefact*total
 
 def Rkk_one_body(j1, l1, j2, l2,  k):             #function overloaded for diff input formats
     '''
@@ -125,25 +197,23 @@ def Rkk_one_body(j1, l1, j2, l2,  k):             #function overloaded for diff 
                     np.sqrt((2*j+1)*(j2+1)*l2*(l2+1)*(2*l2+1))*(-1**(l2+j2/2.+1.5))*sjs(2*l2, 2*l2, 2, j2, 2*j, 1)
     return total*(2*k+1)*(-1**(j1/2.+j2/2.+k))
 
-
 def Ck_cross_s(o1, o2, k):
     '''
     <j1||[Ck x S1]k||j2>
     '''
     total = 0.
-    for j in np.araneg(np.abs(o2.j/2. -1), o2.j/2.+1):
+    for j in np.arange(np.abs(o2.j/2. -1), o2.j/2.+1):
         total+=sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j)*Ck_one_body(o1.j, o1.l, 2*j, o2.l, k)*np.sqrt(6*(o2.j+1)*(2*j+1))*(-1**(o2.l+j+1.5))*sjs(1, 1, 2, o2.j, 2*j, 2*o2.l)
-    return total*np.sqrt(2*k+1)*(-1**(k+o1.j/2.+o2.j/2.))
-
+    return total*np.sqrt(2*k+1)*(-1)**(k+o1.j/2.+o2.j/2.)
 
 def Rkk_cross_s(o1, o2, k):
     '''
-    <j1||[R(k,k) x S1]k||j2>
+    <j1j2||[Ck(1) x Ck(2)||j3j4>
     '''
     total = 0.
-    for j in np.araneg(np.abs(o2.j/2. -1), o2.j/2.+1):
+    for j in np.arange(np.abs(o2.j/2. -1), o2.j/2.+1):
         total+=sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j)*Rkk_one_body(o1.j, o1.l, 2*j, o2.l, k)*np.sqrt(6*(o2.j+1)*(2*j+1))*(-1**(o2.l+j+1.5))*sjs(1, 1, 2, o2.j, 2*j, 2*o2.l)
-    return total*np.sqrt(2*k+1)*(-1**(k+o1.j/2.+o2.j/2.))
+    return total*np.sqrt(2*k+1)*(-1)**(k+o1.j/2.+o2.j/2.)
 
 
 def Rkk1_cross_Ck2_dot_S1(o1, o2, o3, o4, J, k):
@@ -159,6 +229,9 @@ def Rkpls1k1_cross_Ckpls12_dot_S1(o1, o2, o3, o4, J, k):
 def Ck1_cross_Ck2_dot_S1(o1, o2, o3, o4, J, k):
     return -Ck_cross_s(o1, o3, k)*Ck_one_body(o2.j, o2.l, o4.j, o4.l, k)/(3*(2*k+1)*np.sqrt(2*J+1))
 
+def Ck1_cross_Ck2_dot_S2(o1, o2, o3, o4, J, k):
+    return -Ck_cross_s(o2, o4, k)*Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)/(3*(2*k+1)*np.sqrt(2*J+1))
+
 def Ck_dot_Rkk(o1, o2, o3, o4, J, k):
     return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
 
@@ -167,10 +240,10 @@ def Rkk_dot_Rkk(o1, o2, o3, o4, J, k):
     return Rkk_one_body(o1, o3, k)*Rkk_one_body(o2, o4, k)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
 
 def Ck_dot_Rkmin1k(o1, o2, o3, o4, J, k):
-    return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
+    return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1)**(o2.j/2.+J+o3.j/2.)
 
 def Rkmin1k_dot_Rkmin1k(o1, o2, o3, o4, J, k):
-    return Rkk_one_body(o1, o3, k-1)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2
+    return Rkk_one_body(o1, o3, k-1)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1)**(o2.j/2.+J+o3.j/2)
 
 def spin_harmonic_decouple(l1, j1, l2, j2, k, L):
     sum_j = 0
@@ -232,18 +305,124 @@ def ee_laguerre_wave_function(o1,o2,o3,o4,J,zeta):
         integral = coulomb_F_laguerre_wave_function(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta)[0]
         r += integral * sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*l) * thj(o1.j, 2*l, o3.j, -1, 0, 1) * thj(o2.j, 2*l, o4.j, -1, 0, 1)
     return r * np.sqrt( (o1.j+1) * (o2.j+1) * (o3.j+1) * (o4.j+1) ) * (1-2*( ( (o1.j+o3.j)/2+J)%2 ) )
+
+def LS2_A_laguerre(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta, r1, r2):
+    """
+    Integral A^L(a, b, c, d) in the spin-orbit coupling matrix element
+    """
+    if r1 >= r2:
+        return laguerre_wave_function(r1, zeta, n1, l1) * laguerre_wave_function(r2, zeta, n2, l2) * \
+                dlaguerre_wave_function(r1, zeta, n3, l3) * laguerre_wave_function(r2, zeta, n4, l4) * \
+                r2**(L+2)/r1**(L)
+    else:
+        return laguerre_wave_function(r1, zeta, n1, l1) * laguerre_wave_function(r2, zeta, n2, l2) * \
+                dlaguerre_wave_function(r1, zeta, n3, l3) * laguerre_wave_function(r2, zeta, n4, l4) * \
+                r1**(L+1)/r2**(L-1)
+
+def LS2_B_laguerre(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta, r1, r2):
+    """
+    Integral B^L(a, b, c, d) in the spin-orbit coupling matrix element
+    """
+    radial = laguerre_wave_function(r1, zeta, n1, l1) * laguerre_wave_function(r2, zeta, n2, l2) * \
+                laguerre_wave_function(r1, zeta, n3, l3) * laguerre_wave_function(r2, zeta, n4, l4)
+    if r1 >= r2:
+        return radial * (-L)*r2**(L+2)/r1**(L+1)
+    else:
+        return radial * (L+1)*r1**(L)/r2**(L-1)
+
+def LS2_C_laguerre(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta, r1, r2):
+    """
+    Integral C^L(a, b, c, d) in the spin-orbit coupling matrix element
+    """
+    radial = laguerre_wave_function(r1, zeta, n1, l1) * laguerre_wave_function(r2, zeta, n2, l2) * \
+                laguerre_wave_function(r1, zeta, n3, l3) * laguerre_wave_function(r2, zeta, n4, l4)
+    if r1 >= r2:
+        return radial * r2**(L+2)/r1**(L+1)
+    else:
+        return 0
+
+def LS2_D_laguerre(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta, r1, r2):
+    """
+    Integral D^L(a, b, c, d) in the spin-orbit coupling matrix element
+    """
+    radial = laguerre_wave_function(r1, zeta, n1, l1) * laguerre_wave_function(r2, zeta, n2, l2) * \
+                laguerre_wave_function(r1, zeta, n3, l3) * laguerre_wave_function(r2, zeta, n4, l4)
+    if r2 >= r1:
+        return radial * r1**(L+1)/r2**(L)
+    else:
+        return 0
+
+def two_body_spin_orbit(o1, o2, o3, o4, J, zeta, write=True):
+    """
+    Spin-orbit coupling matrix element
+    """
+    if write:
+        print('Start radial integrals')
+    start_radial = time.time()
+
+    lmin = max( abs(o1.j-o3.j), abs(o2.j-o4.j) )//2
+    lmax = min(o1.j+o3.j, o2.j+o4.j  )//2
+    A_L = []
+    B_L = []
+    C_L = []
+    D_L = []
+
+    # create and store radial integrals 
+    for l in range(lmin,lmax+1):
+        if( (o1.l+o3.l+l)%2 == 1) or ( (o2.l+o4.l+l)%2 == 1):
+            A_L.append(0)
+            B_L.append(0)
+            C_L.append(0)
+            D_L.append(0)
+        else:
+            A_L.append(integrate.dblquad(lambda r1, r2: LS2_A_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
+            B_L.append(integrate.dblquad(lambda r1, r2: LS2_B_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
+            C_L.append(integrate.dblquad(lambda r1, r2: LS2_C_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
+            D_L.append(integrate.dblquad(lambda r1, r2: LS2_D_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
+    rad_finish = time.time()
+    if write:
+        print(f"Radial integrals complete in {rad_finish-start_radial:.2f} seconds")
+        print(f"A_L: {A_L}")
+        print(f"B_L: {B_L}")
+        print(f"C_L: {C_L}")
+        print(f"D_L: {D_L}")
+    me = 0.
+    # calculate angular structure
+    for L in range(lmin, lmax+1):
+        coupling = sjs(o1.j, o2.j, J, o4.j, o3.j, 2*L)
+        me += coupling*(math.sqrt(L*(L+1))/(2*L + 1)*A_L[L-lmin]*YLs(o1.j, o1.l, o3.j, o3.l, L, L)*YL(o2.j, o2.l, o4.j, o4.l, L) \
+            + 1/(2*L + 1)*B_L[L-lmin]*YL_Ls(o1.j, o1.l, o3.j, o3.l, L, L, L)*YL(o2.j, o2.l, o4.j, o4.l, L) \
+            + C_L[L-lmin]*YL(o2.j, o2.l, o4.j, o4.l, L)*((L+2)/math.sqrt((2*L+1)*(2*L+3))*YL_Ls(o1.j, o1.l, o3.j, o3.l, L, L+1,L) \
+            + math.sqrt((L+1)*(L+2)/((2*L+1)*(2*L+3)))*YL_Ls(o1.j, o1.l, o3.j, o3.l, L+2, L+1, L)) \
+            -0.5*math.sqrt(L*(L+1))/(2*L + 1)*A_L[L-lmin]*YL(o1.j, o1.l, o3.j, o3.l, L)*YLs(o2.j, o2.l, o4.j, o4.l, L, L) \
+            +0.5/(2*L + 1)*B_L[L-lmin]*YL_L(o1.j, o1.l, o3.j, o3.l, L, L)*YLs(o2.j, o2.l, o4.j, o4.l, L, L) \
+            +0.5*(L+2)*math.sqrt(1/((2*L+1)*(2*L+3)))*C_L[L-lmin]*YL_L(o1.j, o1.l, o3.j, o3.l, L, L+1)*YLs(o2.j, o2.l, o4.j, o4.l, L, L+1) \
+            +0.5*math.sqrt((L+1)*(L+2)/((2*L+1)*(2*L+3)))*C_L[L-lmin]*YL_L(o1.j, o1.l, o3.j, o3.l, L+2, L+1)*YLs(o2.j, o2.l, o4.j, o4.l, L, L+1))
+        
+        if L > 0:
+            me += coupling*(D_L[L-lmin]*math.sqrt(1/(2*L+1))*(-math.sqrt(L*(L-1)/(2*L+3))*YL_Ls(o1.j, o1.l, o3.j, o3.l, L-2, L-1, L)*YL(o2.j, o2.l, o4.j, o4.l, L) \
+            -(L-1)/math.sqrt(2*L-1)*YL_Ls(o1.j, o1.l, o3.j, o3.l, L-1, L, L)*YL(o2.j, o2.l, o4.j, o4.l, L) \
+            -0.5*math.sqrt(L*(L-1)/(2*L+3))*YL_L(o1.j, o1.l, o3.j, o3.l, L-2, L-1)*YLs(o2.j, o2.l, o4.j, o4.l, L, L-1) \
+            -0.5*(L-1)/math.sqrt(2*L+3)*YL_L(o1.j, o1.l, o3.j, o3.l, L, L-1)*YLs(o2.j, o2.l, o4.j, o4.l, L, L-1)))
+    angular_done = time.time()
+    if write:
+        print(f"Angular integrals complete in {angular_done-rad_finish:.2f} seconds")
+    return (-1)**(o2.j/2 + o3.j/2 + J)*4*np.pi*1/(c*c)*me
+
 if(__name__=="__main__"):
+    o = ElectronOrbit(1, 1, 1, 1)
+    print(two_body_spin_orbit(o, o, o, o, 0, 1.0))
     #for x in np.arange(0.0, 10.0, 1):
     #    print(x, laguerre_wave_function(x, 1.0, 0, 0))
-    l = 0
+    # l = 0
     #for n1 in range(5):
     #    t2 = norm_laguerre_wave_function_mom(n1,n1,l)[0]
     #    print(n1, n1, t2)
-    for n1 in range(5):
-        for n2 in range(5):
-            t = T_laguerre_wave_function(n1,n2,l)
-            t2 = T_laguerre_wave_function_int(n1,n2,l)[0]
-            print(n1, n2, t-t2)
+    # for n1 in range(5):
+    #    for n2 in range(5):
+    #        t = T_laguerre_wave_function(n1,n2,l)
+    #        t2 = T_laguerre_wave_function_int(n1,n2,l)[0]
+    #        print(n1, n2, t-t2)
     #for l in range(5):
     #    print( laguerre_wave_function(0.0, 1.0, 3, l) )
 
