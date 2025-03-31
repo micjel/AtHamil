@@ -16,7 +16,7 @@ program AtHamil
   call ms%init(sps, params%e2max, params%zeta)
 
   select case(params%OpName)
-  case("Coulomb", "Breit")
+  case("Coulomb", "Breit", "Breit_1b")
     call h%init(ms, params%OpName)
     f = trim(params%file_name)
     if(f == "default") f = h%GetFileName()

@@ -15,7 +15,7 @@ Host= $(shell if hostname|grep -q apt1; then echo apt; \
   elif hostname|grep -q cedar; then echo cedar; \
   else echo other; fi)
 HOST=$(strip $(Host))
-DEBUG_MODE=on
+DEBUG_MODE=off 
 Gauss_Laguerre=off
 
 OS = Linux
@@ -52,6 +52,32 @@ ifeq ($(strip $(HOST)),other)
   CFLAGS= -O3
   FFLAGS+= -fopenmp
   FFLAGS+= -Dsingle_precision
+  FFLAGS+= -cpp 
+  FFLAGS+= -fallow-argument-mismatch
+  FFLAGS+= -DVERSION=\"$(VERSION)\"
+  ifeq ($(Gauss_Laguerre),on)
+    FFLAGS+= -Dgauss_laguerre
+  endif
+  ifeq ($(DEBUG_MODE),on)
+    DFLAGS+=-Wall -pedantic -fbounds-check -O -Wuninitialized -fbacktrace
+    #FDFLAGS+=-ffpe-trap=invalid,zero,overflow # Note: gsl larguerre signal
+    ifneq ($(OS), OSX)
+      DFLAGS+= -pg -g
+    endif
+  endif
+endif
+
+ifeq ($(strip $(HOST)),cedar)
+  FDEP=makedepf90
+  FC=gfortran
+  LFLAGS+= -I/usr/local/include -L/usr/local/lib
+  LFLAGS+= -lflexiblas -lgsl -lz
+  FFLAGS= -O3
+  CFLAGS= -O3
+  FFLAGS+= -fopenmp
+  FFLAGS+= -Dsingle_precision
+  FFLAGS+= -cpp 
+  FFLAGS+= -fallow-argument-mismatch
   FFLAGS+= -DVERSION=\"$(VERSION)\"
   ifeq ($(Gauss_Laguerre),on)
     FFLAGS+= -Dgauss_laguerre
@@ -75,6 +101,8 @@ ifeq ($(strip $(HOST)),oak)
   CFLAGS= -O3
   FFLAGS+= -fopenmp
   FFLAGS+= -Dsingle_precision
+  FFLAGS+= -cpp 
+  FFLAGS+= -fallow-argument-mismatch # untested but fallow-argument-mismatch is needed for gcc ver. > 10
   FFLAGS+= -DVERSION=\"$(VERSION)\"
   ifeq ($(Gauss_Laguerre),on)
     FFLAGS+= -Dgauss_laguerre
@@ -137,6 +165,11 @@ OBJS_ALL = $(OBJS) $(OBJS_Main) $(OBJS_LinAlg)
 
 MODOUT=
 ifeq ($(strip $(HOST)),other)
+  MODOUT=-J$(MODDIR)
+endif
+
+MODOUT=
+ifeq ($(strip $(HOST)),cedar)
   MODOUT=-J$(MODDIR)
 endif
 

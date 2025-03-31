@@ -131,7 +131,7 @@ contains
     case("LO", "lo", "LO-2nl", "lo-2nl")
       call this%kinetic%set("kinetic_laguerre", this%ms%zeta, NMesh_mom, pmax )
       call this%potential%set("coulomb_laguerre", this%ms%zeta, NMesh, rmax )
-      if( this%OpName == "Breit") then
+      if ( this%OpName == "Breit" .or. this%OpName == "Breit_1b" ) then
         call this%kinetic_p4%set("kinetic_correction_laguerre", this%ms%zeta, NMesh_mom, pmax )
         call this%Darwin_term%set("Darwin_laguerre", this%ms%zeta )
         call this%LS_term%set("spin_orbit_laguerre", this%ms%zeta, NMesh, rmax )

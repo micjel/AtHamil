@@ -73,7 +73,6 @@ def sjs(j1, j2, j3, j4, j5, j6):
     except ValueError:
         return 0
 
-
 def njs(j1, j2, j3, j4, j5, j6, j7, j8, j9):
     """
     9-j symbol
@@ -166,8 +165,28 @@ def Rkk_one_body(o1, o2, k):
     for j in np.arange(np.abs(o2.j/2. - 1), o2.j/2. + 2):
         l = o2.l
         total+=Ck_one_body(o1.j, o1.l, 2*j, l, k)*sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j) * \
-                    np.sqrt((2*j+1)*(o2.j+1)*l*(l+1)*(2*l+1))*(-1**(l+o2.j/2.+1.5))*sjs(2*l, 2*l, 2, o2.j, 2*j, 1)
+                    np.sqrt((2*j+1)*(o2.j+1)*l*(l+1)*(2*l+1))*(-1)**(l+o2.j/2.+1.5)*sjs(2*l, 2*l, 2, o2.j, 2*j, 1)
     return total*(2*k+1)*(-1**(o1.j/2.+o2.j/2.+k))
+
+def YL_L(j1, l1, j2, l2, L, K):
+    """
+    < j1 || [Y^L L]^K || j2 > 
+    """
+    total = 0.
+    prefact = (-1)**(j1+j2+K)*np.sqrt(2*K+1)
+    for j in [l2 - 1/2, l2 + 1/2]:
+        total+=sjs(2*L, 2, 2*K, j2, j1, 2*j)*YL(j1, l1, 2*j, l2, L)*L_element(2*j, l2, j2, l2)
+    return prefact*total 
+
+def YL_Ls(j1, l1, j2, l2, L, K, M):
+    """
+    < j1 || [[Y^L L]^Ks]^M || j2 > 
+    """
+    prefact = (-1)**(j1+j2+M)*math.sqrt(2*M+1)
+    total = 0.
+    for j in [K - 1/2, K + 1/2]:
+        total += sjs(2*K, 2, 2*M, j2, j1, 2*j)*YL_L(j1, l1, 2*j, l2, L, K)*math.sqrt(3/2)
+    return prefact*total
 
 def Rkk_one_body(j1, l1, j2, l2,  k):             #function overloaded for diff input formats
     '''
@@ -207,17 +226,16 @@ def Ck_cross_s(o1, o2, k):
     total = 0.
     for j in np.arange(np.abs(o2.j/2. -1), o2.j/2.+1):
         total+=sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j)*Ck_one_body(o1.j, o1.l, 2*j, o2.l, k)*np.sqrt(6*(o2.j+1)*(2*j+1))*(-1**(o2.l+j+1.5))*sjs(1, 1, 2, o2.j, 2*j, 2*o2.l)
-    return total*np.sqrt(2*k+1)*(-1**(k+o1.j/2.+o2.j/2.))
-
+    return total*np.sqrt(2*k+1)*(-1)**(k+o1.j/2.+o2.j/2.)
 
 def Rkk_cross_s(o1, o2, k):
     '''
-    <j1||[R(k,k) x S1]k||j2>
+    <j1j2||[Ck(1) x Ck(2)||j3j4>
     '''
     total = 0.
     for j in np.arange(np.abs(o2.j/2. -1), o2.j/2.+1):
-        total+=sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j)*Rkk_one_body(o1.j, o1.l, 2*j, o2.l, k)*math.sqrt(6*(o2.j+1)*(2*j+1))*(-1**(o2.l+j+1.5))*sjs(1, 1, 2, o2.j, 2*j, 2*o2.l)
-    return total*math.sqrt(2*k+1)*(-1**(k+o1.j/2.+o2.j/2.))
+        total+=sjs(2*k, 2, 2*k, o2.j, o1.j, 2*j)*Rkk_one_body(o1.j, o1.l, 2*j, o2.l, k)*np.sqrt(6*(o2.j+1)*(2*j+1))*(-1**(o2.l+j+1.5))*sjs(1, 1, 2, o2.j, 2*j, 2*o2.l)
+    return total*np.sqrt(2*k+1)*(-1)**(k+o1.j/2.+o2.j/2.)
 
 
 def Rkk1_cross_Ck2_dot_S1(o1, o2, o3, o4, J, k):
@@ -233,6 +251,9 @@ def Rkpls1k1_cross_Ckpls12_dot_S1(o1, o2, o3, o4, J, k):
 def Ck1_cross_Ck2_dot_S1(o1, o2, o3, o4, J, k):
     return -Ck_cross_s(o1, o3, k)*Ck_one_body(o2.j, o2.l, o4.j, o4.l, k)/(3*(2*k+1)*np.sqrt(2*J+1))
 
+def Ck1_cross_Ck2_dot_S2(o1, o2, o3, o4, J, k):
+    return -Ck_cross_s(o2, o4, k)*Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)/(3*(2*k+1)*np.sqrt(2*J+1))
+
 def Ck_dot_Rkk(o1, o2, o3, o4, J, k):
     return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
 
@@ -241,10 +262,10 @@ def Rkk_dot_Rkk(o1, o2, o3, o4, J, k):
     return Rkk_one_body(o1, o3, k)*Rkk_one_body(o2, o4, k)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
 
 def Ck_dot_Rkmin1k(o1, o2, o3, o4, J, k):
-    return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2.))
+    return Ck_one_body(o1.j, o1.l, o3.j, o3.l, k)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1)**(o2.j/2.+J+o3.j/2.)
 
 def Rkmin1k_dot_Rkmin1k(o1, o2, o3, o4, J, k):
-    return Rkk_one_body(o1, o3, k-1)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1**(o2.j/2.+J+o3.j/2))
+    return Rkk_one_body(o1, o3, k-1)*Rkk_one_body(o2, o4, k-1)*sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*k)*(-1)**(o2.j/2.+J+o3.j/2)
 
 def spin_harmonic_decouple(l1, j1, l2, j2, k, L):
     sum_j = 0
@@ -382,14 +403,12 @@ def two_body_spin_orbit_(o1, o2, o3, o4, J, zeta, write=False):
             C_L.append(integrate.dblquad(lambda r1, r2: LS2_C_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
             D_L.append(integrate.dblquad(lambda r1, r2: LS2_D_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
     rad_finish = time.time()
-
     if write:
         print(f"Radial integrals complete in {rad_finish-start_radial:.2f} seconds")
         print(f"A_L: {A_L}")
         print(f"B_L: {B_L}")
         print(f"C_L: {C_L}")
         print(f"D_L: {D_L}")
-
     me = 0.
     # calculate angular structure
     for L in range(lmin, lmax+1):

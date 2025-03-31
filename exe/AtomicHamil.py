@@ -9,12 +9,28 @@ from collections import OrderedDict
 exe = 'AtHamil.exe'
 
 def set_input(params,zeta):
+    """
+    Generate the input file to run AtHamil. Edit parameters below. 
+    Available Hamiltonians are:
+        Coulomb     Nonrelativistic Coulomb Hamiltonian with one-body and two-body interaction
+        Breit_1b    Coulomb Hamiltonian with one-body leading-order relativistic corrections. This is a 
+                    much cheaper calculation than the full Breit Hamiltonian. Laguerre orbitals only. 
+        Breit       Breit Hamiltonian with all O(alpha^2) corrections. Currently work in progress. 
+
+    The matrix elements of isotope shift operators can also be generated.
+        NormalMassShift     p_i \cdot p_i, proportional to the leading-order normal mass shift. 
+        SpecificMassShift   \sum_{i \neq j} p_i \cdot p_j, proportional to the leading-order specific
+                            mass shift. Two-body portion of the mass shift. 
+        MassShift           Sum of normal and specific mass shifts.
+        FieldShift          Leading-order field shift operator. 
+    """
     # basic parameters
     params["basis"] = "LO"
     params["zeta"] = zeta
-    params['emax'] = 4
-    params['e2max'] = 8
-    params["file_name"]="Breit_Hamil_"+params["basis"]+str(params["zeta"])+\
+    params['emax'] = 6
+    params['e2max'] = 12
+    params['opname'] = 'Coulomb'
+    params["file_name"]="Coulomb_Hamil_"+params["basis"]+str(params["zeta"])+\
             "_emax"+str(params["emax"])+"_e2max"+str(params["e2max"])
     if( "lmax" in params): params["file_name_nn"]+= "_lmax"+str(params["lmax"])
     params["file_name"]+=".snt"
