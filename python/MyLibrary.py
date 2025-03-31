@@ -175,11 +175,8 @@ def Rkk_one_body(j1, l1, j2, l2,  k):             #function overloaded for diff 
     '''
     total = 0.
     for j in np.arange(np.abs(j2/2. - 1), j2/2. + 1):
-        print(f'Ck result for {j}: {Ck_one_body(j1, l1, 2*j, l2, k)}')
-        print(f'Prefactor Rkk: {(2*k+1)*(-1**(j1/2.+j2/2.+k))}')
         total+=Ck_one_body(j1, l1, 2*j, l2, k)*sjs(2*k, 2, 2*k, j2, j1, 2*j) * \
         np.sqrt((2*j+1)*(j2+1)*l2*(l2+1)*(2*l2+1))*(-1**(l2+j2/2.+1.5))*sjs(2*l2, 2*l2, 2, j2, 2*j, 1)
-    
     return total*(2*k+1)*(-1**(j1/2.+j2/2.+k))
 
 
@@ -188,7 +185,7 @@ def YL_L(j1, l1, j2, l2, L, K):
     < j1 || [Y^L L]^K || j2 > 
     """
     total = 0.
-    prefact = (-1)**(j1+j2+K)*np.sqrt(2*K+1)
+    prefact = (-1)**((j1+j2)/2+K)*np.sqrt(2*K+1)
     for j in [l2 - 1/2, l2 + 1/2]:
         total+=sjs(2*L, 2, 2*K, j2, j1, 2*j)*YL(j1, l1, 2*j, l2, L)*L_element(2*j, l2, j2, l2)
     return prefact*total 
@@ -197,7 +194,7 @@ def YL_Ls(j1, l1, j2, l2, L, K, M):
     """
     < j1 || [[Y^L L]^Ks]^M || j2 > 
     """
-    prefact = (-1)**(j1+j2+M)*math.sqrt(2*M+1)
+    prefact = (-1)**((j1+j2)/2+M)*math.sqrt(2*M+1)
     total = 0.
     for j in [K - 1/2, K + 1/2]:
         total += sjs(2*K, 2, 2*M, j2, j1, 2*j)*YL_L(j1, l1, 2*j, l2, L, K)*math.sqrt(3/2)
@@ -291,7 +288,7 @@ def two_body_darwin(o1, o2, o3, o4, J, zeta):
         if( (o1.l+o3.l+l)%2 == 1): continue
         if( (o2.l+o4.l+l)%2 == 1): continue
         integral = darwin_overlap_integral(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta)[0]
-        r += integral * sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*l) * thj(o1.j, 2*l, o3.j, -1, 0, 1) * thj(o2.j, 2*l, o4.j, -1, 0, 1)
+        r += integral * sjs(o1.j, o2.j, J, o4.j, o3.j, 2*l) * thj(o1.j, 2*l, o3.j, -1, 0, 1) * thj(o2.j, 2*l, o4.j, -1, 0, 1)
     return r * np.sqrt( (o1.j+1) * (o2.j+1) * (o3.j+1) * (o4.j+1) ) * (1-2*( ( (o1.j+o3.j)/2+J)%2 ) ) / (4*c*c)
 
 
@@ -306,9 +303,9 @@ def ee_laguerre_wave_function(o1,o2,o3,o4,J,zeta):
     for l in range(lmin,lmax+1):
         if( (o1.l+o3.l+l)%2 == 1): continue
         if( (o2.l+o4.l+l)%2 == 1): continue
-        integral = coulomb_F_laguerre_wave_function(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta)[0]
+        integral, error = coulomb_F_laguerre_wave_function(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta)
         r += integral * sjs(o1.j, o2.j, 2*J, o4.j, o3.j, 2*l) * thj(o1.j, 2*l, o3.j, -1, 0, 1) * thj(o2.j, 2*l, o4.j, -1, 0, 1)
-    return r * np.sqrt( (o1.j+1) * (o2.j+1) * (o3.j+1) * (o4.j+1) ) * (1-2*( ( (o1.j+o3.j)/2+J)%2 ) )
+    return r * np.sqrt( (o1.j+1) * (o2.j+1) * (o3.j+1) * (o4.j+1) ) * (-1)**((o1.j+o3.j)/2+J)
 
 def LS2_A_laguerre(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta, r1, r2):
     """
@@ -356,11 +353,13 @@ def LS2_D_laguerre(n1,l1,n2,l2,n3,l3,n4,l4,L, zeta, r1, r2):
     else:
         return 0
 
-def two_body_spin_orbit(o1, o2, o3, o4, J, zeta):
+def two_body_spin_orbit_(o1, o2, o3, o4, J, zeta, write=False):
     """
     Spin-orbit coupling matrix element
+    write - verbose option for troubleshooting
     """
-    print('Start radial integrals')
+    if write:
+        print('Start radial integrals')
     start_radial = time.time()
 
     lmin = max( abs(o1.j-o3.j), abs(o2.j-o4.j) )//2
@@ -383,11 +382,14 @@ def two_body_spin_orbit(o1, o2, o3, o4, J, zeta):
             C_L.append(integrate.dblquad(lambda r1, r2: LS2_C_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
             D_L.append(integrate.dblquad(lambda r1, r2: LS2_D_laguerre(o1.n, o1.l, o2.n, o2.l, o3.n, o3.l, o4.n, o4.l, l, zeta, r1, r2), 0, np.inf, lambda r1: 0, lambda r1: np.inf)[0])
     rad_finish = time.time()
-    print(f"Radial integrals complete in {rad_finish-start_radial:.2f} seconds")
-    print(f"A_L: {A_L}")
-    print(f"B_L: {B_L}")
-    print(f"C_L: {C_L}")
-    print(f"D_L: {D_L}")
+
+    if write:
+        print(f"Radial integrals complete in {rad_finish-start_radial:.2f} seconds")
+        print(f"A_L: {A_L}")
+        print(f"B_L: {B_L}")
+        print(f"C_L: {C_L}")
+        print(f"D_L: {D_L}")
+
     me = 0.
     # calculate angular structure
     for L in range(lmin, lmax+1):
@@ -407,10 +409,34 @@ def two_body_spin_orbit(o1, o2, o3, o4, J, zeta):
             -0.5*math.sqrt(L*(L-1)/(2*L+3))*YL_L(o1.j, o1.l, o3.j, o3.l, L-2, L-1)*YLs(o2.j, o2.l, o4.j, o4.l, L, L-1) \
             -0.5*(L-1)/math.sqrt(2*L+3)*YL_L(o1.j, o1.l, o3.j, o3.l, L, L-1)*YLs(o2.j, o2.l, o4.j, o4.l, L, L-1)))
     angular_done = time.time()
-    print(f"Angular integrals complete in {angular_done-rad_finish:.2f} seconds")
+    if write:
+        print(f"Angular integrals complete in {angular_done-rad_finish:.2f} seconds")
     return (-1)**(o2.j/2 + o3.j/2 + J)*4*np.pi*1/(c*c)*me
 
-# if(__name__=="__main__"):
+def two_body_spin_orbit(o1, o2, o3, o4, J, zeta=1.0):
+    return two_body_spin_orbit_(o1, o2, o3, o4, J, zeta) + \
+              two_body_spin_orbit_(o2, o1, o4, o3, J, zeta)
+
+if(__name__=="__main__"):
+    #e13_a = ElectronOrbit(3, 2, 3, 23)
+    #e13_b = ElectronOrbit(3, 1, 1, 16)
+    #e13_c = ElectronOrbit(2, 1, 3, 12)
+    #e13_d = ElectronOrbit(0, 2, 3, 8)
+    # default 3 3 1 0
+    e13_a = ElectronOrbit(3, 5, 11, 75)
+    e13_b = ElectronOrbit(3, 5, 9, 74)
+    e13_c = ElectronOrbit(1, 5, 11, 47)
+    e13_d = ElectronOrbit(0, 5, 9, 35)
+    J = 2
+    # e13_d = ElectronOrbit(2, 0, 1, 5)
+    # print(ee_laguerre_wave_function(e13_o, e13_o, e13_o, e13_o, J, 1.0))
+    
+    rabcd = two_body_spin_orbit(e13_a, e13_b, e13_c, e13_d, J, zeta=1.0)
+    rbacd = two_body_spin_orbit(e13_b, e13_a, e13_c, e13_d, J, zeta=1.0) * (-1.0)**((e13_a.j + e13_b.j)/2 - J - 1)
+    rabdc = two_body_spin_orbit(e13_a, e13_b, e13_d, e13_c, J, zeta=1.0) * (-1.0)**((e13_c.j + e13_d.j)/2 - J - 1)
+    rbadc = two_body_spin_orbit(e13_b, e13_a, e13_d, e13_c, J, zeta=1.0) * (-1.0)**((e13_a.j + e13_b.j + e13_c.j + e13_d.j)/2)
+
+    print(0.5*(rabcd + rbacd + rabdc + rbadc))
     #for x in np.arange(0.0, 10.0, 1):
     #    print(x, laguerre_wave_function(x, 1.0, 0, 0))
 
