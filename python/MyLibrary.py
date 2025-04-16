@@ -198,26 +198,8 @@ def Rkk_one_body(j1, l1, j2, l2,  k):             #function overloaded for diff 
         np.sqrt((2*j+1)*(j2+1)*l2*(l2+1)*(2*l2+1))*(-1**(l2+j2/2.+1.5))*sjs(2*l2, 2*l2, 2, j2, 2*j, 1)
     return total*(2*k+1)*(-1**(j1/2.+j2/2.+k))
 
-
-def YL_L(j1, l1, j2, l2, L, K):
-    """
-    < j1 || [Y^L L]^K || j2 > 
-    """
-    total = 0.
-    prefact = (-1)**((j1+j2)/2+K)*np.sqrt(2*K+1)
-    for j in [l2 - 1/2, l2 + 1/2]:
-        total+=sjs(2*L, 2, 2*K, j2, j1, 2*j)*YL(j1, l1, 2*j, l2, L)*L_element(2*j, l2, j2, l2)
-    return prefact*total 
-
-def YL_Ls(j1, l1, j2, l2, L, K, M):
-    """
-    < j1 || [[Y^L L]^Ks]^M || j2 > 
-    """
-    prefact = (-1)**((j1+j2)/2+M)*math.sqrt(2*M+1)
-    total = 0.
-    for j in [K - 1/2, K + 1/2]:
-        total += sjs(2*K, 2, 2*M, j2, j1, 2*j)*YL_L(j1, l1, 2*j, l2, L, K)*math.sqrt(3/2)
-    return prefact*total
+print(Rkk_one_body(1, 1, 3, 2, 1))
+print(YL_L(1, 1, 3, 2, 1, 1))
 
 def Ck_cross_s(o1, o2, k):
     '''

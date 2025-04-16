@@ -178,8 +178,8 @@ contains
 
       r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
           & I1 * sqrt( dble(L*(L+1))/dble(2*L+1) ) * &
-          & C_function(L,oa%l,oa%j,oc%l,oc%j) * C_function(L,ob%l,ob%j,od%l,od%j)
-      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) / ( dble(2*L+1)*sqrt(dble(2*L+1))) * &
+          & CS_function(L,L,oa%l,oa%j,oc%l,oc%j) * C_function(L,ob%l,ob%j,od%l,od%j)
+      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) / ( dble(2*L+1)) * &
           & I2 * RS_function(L,L,L,oa%l,oa%j,oc%l,oc%j) * C_function(L,ob%l,ob%j,od%l,od%j)
       r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
           & dble(L+2) / sqrt( dble( (2*L+1) * (2*L+3) )) * &
@@ -187,16 +187,34 @@ contains
       r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
           & sqrt( dble((L+1)*(L+2))) / sqrt( dble( (2*L+1) * (2*L+3) )) * &
           & I3 * RS_function(L+2,L+1,L,oa%l,oa%j,oc%l,oc%j) * C_function(L,ob%l,ob%j,od%l,od%j)
+      r = r - 0.5d0 * sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+          & sqrt( dble(L*(L+1))/dble(2*L+1) ) * &
+          & I1 * C_function(L,oa%l,oa%j,oc%l,oc%j) * CS_function(L,L,ob%l,ob%j,od%l,od%j)
+      r = r + 0.5d0 * sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+          & 1.d0 / ( dble(2*L+1)) * &
+          & I2 * R_function(L,L,oa%l,oa%j,oc%l,oc%j) * CS_function(L,L,ob%l,ob%j,od%l,od%j)
+      r = r + 0.5d0 * sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+          & dble(L+2) / sqrt( dble( (2*L+1) * (2*L+3) )) * &
+          & I3 * R_function(L,L+1,oa%l,oa%j,oc%l,oc%j) * CS_function(L,L+1,ob%l,ob%j,od%l,od%j)
+      r = r + 0.5d0 * sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+          & sqrt( dble((L+1)*(L+2))) / sqrt( dble( (2*L+1) * (2*L+3) )) * &
+          & I3 * R_function(L+2,L+1,oa%l,oa%j,oc%l,oc%j) * CS_function(L,L+1,ob%l,ob%j,od%l,od%j)
       if( L == 0 ) cycle
-      r = r + sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
-          &  dble(L-1) / sqrt( dble( (2*L+1) * (2*L-1) )) * &
+      r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+          &  dble((L-1)) / sqrt( dble( (2*L+1) * (2*L-1) )) * &
           & I4 * RS_function(L-1,L,L,oa%l,oa%j,oc%l,oc%j) * C_function(L,ob%l,ob%j,od%l,od%j)
+      r = r - 0.5d0 * sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+          & dble((L-1))/sqrt( dble( (2*L+1)*(2*L+3) )) * &
+          & I4 * R_function(L-1,L,oa%l,oa%j,oc%l,oc%j) * CS_function(L,L-1,ob%l,ob%j,od%l,od%j)
       if( L == 1 ) cycle
       r = r - sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
           & sqrt( dble((L-1)*L)) / sqrt( dble( (2*L+1) * (2*L-1) )) * &
           & I4 * RS_function(L-2,L-1,L,oa%l,oa%j,oc%l,oc%j) * C_function(L,ob%l,ob%j,od%l,od%j)
+      r = r - 0.5d0 * sjs( oa%j, ob%j, 2*J, od%j, oc%j, 2*L ) * &
+          & sqrt( dble((L-1)*L)) / sqrt( dble( (2*L+1) * (2*L+3) )) * &
+          & I4 * R_function(L-2,L-1,oa%l,oa%j,oc%l,oc%j) * CS_function(L,L-1,ob%l,ob%j,od%l,od%j)
     end do
-    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) / alpha**2
+    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) * 4*pi / alpha**2
   end function ee_spin_orbit_interaction_
 
   function C_function(L, la, ja, lc, jc) result(r)
