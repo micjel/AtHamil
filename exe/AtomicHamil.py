@@ -13,8 +13,9 @@ def set_input(params,zeta):
     Generate the input file to run AtHamil. Edit parameters below. 
     Available Hamiltonians are:
         Coulomb     Nonrelativistic Coulomb Hamiltonian with one-body and two-body interaction
-        Breit_1b    Coulomb Hamiltonian with one-body leading-order relativistic corrections. This is a 
-                    much cheaper calculation than the full Breit Hamiltonian. Laguerre orbitals only. 
+        Breit_1b    Coulomb Hamiltonian with one-body relativistic corrections only. This is a 
+                    cheaper calculation than the full Breit Hamiltonian and allows you to
+                    compute each 1b fine-structure correction quickly. Laguerre orbitals only. 
         Breit       Breit Hamiltonian with all O(alpha^2) corrections. Currently work in progress. 
 
     The matrix elements of isotope shift operators can also be generated.
@@ -32,7 +33,7 @@ def set_input(params,zeta):
     params['opname'] = 'Coulomb'
     params["file_name"]="Coulomb_Hamil_"+params["basis"]+str(params["zeta"])+\
             "_emax"+str(params["emax"])+"_e2max"+str(params["e2max"])
-    if( "lmax" in params): params["file_name_nn"]+= "_lmax"+str(params["lmax"])
+    if( "lmax" in params): params["file_name"]+= "_lmax"+str(params["lmax"])
     params["file_name"]+=".snt"
 
 def gen_script(params, batch, machine):
@@ -106,7 +107,7 @@ def main(machinename=None):
         if(machine=="oak"):
             cmd = "qsub " + fsh
         if(machine=="cedar"):
-            cmd = "srun " + fsh
+            cmd = "sbatch " + fsh
         subprocess.call(cmd,shell=True)
 
 if(__name__ == "__main__"):
