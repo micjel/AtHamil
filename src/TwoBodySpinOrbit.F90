@@ -214,11 +214,11 @@ contains
           & sqrt( dble((L-1)*L)) / sqrt( dble( (2*L+1) * (2*L+3) )) * &
           & I4 * R_function(L-2,L-1,oa%l,oa%j,oc%l,oc%j) * CS_function(L,L-1,ob%l,ob%j,od%l,od%j)
     end do
-    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) * 4*pi / alpha**2
+    r = r * (-1.d0)**((ob%j + oc%j) /2 + J) / alpha**2
   end function ee_spin_orbit_interaction_
 
   function C_function(L, la, ja, lc, jc) result(r)
-    ! ( a || Y^L || c )
+    ! 4pi * ( a || Y^L || c )
     use AtLibrary, only: tjs, triag
     integer, intent(in) :: L, la, ja, lc, jc
     real(8) :: r
@@ -241,6 +241,7 @@ contains
   end function CS_function
 
   function RS_function(G, K, L, la, ja, lc, jc) result(r)
+    ! ( a || [[Y^G L]^K S]^L || c )
     use AtLibrary, only: snj
     integer, intent(in) :: G, K, L, la, ja, lc, jc
     real(8) :: r
@@ -281,6 +282,22 @@ contains
         & sjs( 2*K, 2*L, 2, 2*lc, 2*lc, 2*la ) * &
         & tjs( 2*la, 2*K, 2*lc, 0, 0, 0 )
   end function R_function
+
+  function R_function_(K, L, la, ja, lc, jc) result(r)
+    ! temporary test for 4pi*R(K, L) in j-coupled basis
+    use AtLibrary, only: tjs, sjs, triag
+    integer, intent(in) :: K, L, la, ja, lc, jc
+    real(8) :: r
+    r = 0.d0
+    if( mod(la+lc+K,2) == 1) return
+    if( lc==0 ) return
+    r = sjs(2*L, 2, 2*K, jc, ja, jc - 1) * C_function(K, la, ja, lc, jc - 1) * & 
+        & sqrt( dble( (ja+1)*(jc+1)*(2*la+1)*(2*lc+1)*(2*L+1)*(2*K+1) )) * &
+        & sjs(2*lc, 2*lc, 1, jc, jc - 1, 1)
+    r = r + sjs(2*L, 2, 2*K, jc, ja, jc + 1) * C_function(K, la, ja, lc, jc + 1) * & 
+    & sqrt( dble( (ja+1)*(jc+1)*(2*la+1)*(2*lc+1)*(2*L+1)*(2*K+1) )) * &
+    & sjs(2*lc, 2*lc, 1, jc, jc + 1, 1)
+  end function R_function_
 
   subroutine finalize_fnl(this)
     class(Fnl), intent(inout) :: this
